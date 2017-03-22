@@ -745,13 +745,15 @@ LoRaWANExampleTracing::CalculateDataRateIndexPER (Ptr<Application> endDeviceApp)
   Vector endDevicePos = endDeviceMobility->GetPosition ();
   double distance = CalculateDistance (endDeviceMobility->GetPosition (), posGw);
 
-  std::cout << "CalculateDataRateIndexPER: node " << endDeviceNode->GetId () << "\tDRindex = " << (unsigned int)calculatedDataRateIndex
-    << "\tSF=" << (unsigned int)LoRaWAN::m_supportedDataRates[calculatedDataRateIndex].spreadingFactor
-    << "\tmaxRxPowerdBm = " << maxRxPowerdBm << "dBm\tsnrDb = " << snrDb << "dB" << "\tpos=(" << endDevicePos.x << "," << endDevicePos.y << "\td=" << distance << "m" << std::endl;
+  if (m_verbose) {
+    std::cout << "CalculateDataRateIndexPER: node " << endDeviceNode->GetId () << "\tDRindex = " << (unsigned int)calculatedDataRateIndex
+      << "\tSF=" << (unsigned int)LoRaWAN::m_supportedDataRates[calculatedDataRateIndex].spreadingFactor
+      << "\tmaxRxPowerdBm = " << maxRxPowerdBm << "dBm\tsnrDb = " << snrDb << "dB" << "\tpos=(" << endDevicePos.x << "," << endDevicePos.y << "\td=" << distance << "m" << std::endl;
 
-  if (!hitPerLimit) { // this is just for debugging purposes
-    std::cout << "CalculateDataRateIndexPER: failed to find a data rate where the PER is lower than " << m_drCalcPerLimit << "."
-      << "Last calculated PER was equal to " << std::setiosflags (std::ios::fixed) << std::setprecision (9) << perForDR << std::endl;
+    if (!hitPerLimit) { // this is just for debugging purposes
+      std::cout << "CalculateDataRateIndexPER: failed to find a data rate where the PER is lower than " << m_drCalcPerLimit << "."
+        << "Last calculated PER was equal to " << std::setiosflags (std::ios::fixed) << std::setprecision (9) << perForDR << std::endl;
+    }
   }
 
   return calculatedDataRateIndex;
