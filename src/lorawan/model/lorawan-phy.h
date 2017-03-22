@@ -170,7 +170,7 @@ public:
   bool SetTxConf (int8_t power, uint8_t channelIndex, uint8_t dataRateIndex, uint8_t codeRate, uint8_t preambleLength, bool implicitHeader, bool crcOn);
 
   uint8_t GetCurrentChannelIndex () const { return m_currentChannelIndex; }
-  uint8_t GetCurrentDataRatendex () const { return m_currentDataRateIndex; }
+  uint8_t GetCurrentDataRateIndex () const { return m_currentDataRateIndex; }
 
   /**
    * Calculate the time for transmitting the given packet in microseconds

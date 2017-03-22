@@ -961,7 +961,7 @@ LoRaWANMac::OpenRW ()
     // RW1 uses the same channel as the preceding uplink
     // The data rate is a function of the uplink data rate and the RX1DROffset
     uint8_t channelIndex = m_phy->GetCurrentChannelIndex ();
-    uint8_t dataRateIndex = LoRaWAN::GetRX1DataRateIndex (m_phy->GetCurrentDataRatendex (), m_RX1DROffset);
+    uint8_t dataRateIndex = LoRaWAN::GetRX1DataRateIndex (m_phy->GetCurrentDataRateIndex (), m_RX1DROffset);
 
     uint8_t subBandIndex = LoRaWAN::m_supportedChannels [channelIndex].m_subBandIndex;
     uint8_t maxTxPower = m_lorawanMacRDC->GetMaxPowerForSubBand (subBandIndex);

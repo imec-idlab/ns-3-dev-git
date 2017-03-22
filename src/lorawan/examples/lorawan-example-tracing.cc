@@ -82,7 +82,8 @@ public:
                std::string phyTransmissionTraceCSVFileName,
                std::string phyStateTraceCSVFileName,
                std::string macPacketTraceCSVFileName,
-               std::string macStateTraceCSVFileName);
+               std::string macStateTraceCSVFileName,
+               std::string nodesCSVFileName);
 
   void LogOutputLine (std::string output, std::string);
 
@@ -138,6 +139,7 @@ private:
   std::string m_macPacketTraceCSVFileName;
   std::string m_macStateTraceCSVFileName;
   std::map<std::string, std::ofstream> output_streams;
+  std::string m_nodesCSVFileName;
 
   //std::string m_rate;
   //std::string m_phyMode;
@@ -161,6 +163,7 @@ private:
   void CreateDevices ();
   void SetupTracing (bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates);
   void InstallApplications ();
+  void OutputNodesToFile ();
 };
 
 int main (int argc, char *argv[])
@@ -315,10 +318,18 @@ int main (int argc, char *argv[])
       out3.close ();
     }
 
-    // Config::SetDefault ("ns3::OnOffApplication::PacketSize", StringValue ("1000"));
-    // Config::SetDefault ("ns3::OnOffApplication::DataRate", StringValue (rate));
-    // Config::SetDefault ("ns3::WifiRemoteStationManager::NonUnicastMode", StringValue (phyMode));
-    // Config::SetDefault ("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue ("2000"));
+
+    std::ostringstream nodesCSVFileName;
+    nodesCSVFileName << simRunFilesPrefix.str() << "-nodes.csv";
+    std::ofstream out4 (macStateTraceCSVFileName.str ().c_str ());
+    out4 << "DeviceType," <<
+      "NodeId," <<
+      "Position x," <<
+      "Position y," <<
+      "DistanceToClosestGW," <<
+      "DataRateIndex" <<
+      std::endl;
+    out4.close ();
 
     std::cout << std::endl;
 
@@ -348,6 +359,7 @@ int main (int argc, char *argv[])
     simSettings << "\tphyStateTraceCSVFileName = " << phyStateTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacPacketTraceCSVFileName = " << macPacketTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacStateTraceCSVFileName = " << macStateTraceCSVFileName.str() << std::endl;
+    simSettings << "\tnodesCSVFileName = " << nodesCSVFileName.str() << std::endl;
     simSettings << "\tData rate assignment method index: " << loRaWANDataRateCalcMethodIndex;
     if (loRaWANDataRateCalcMethodIndex == LORAWAN_DR_CALC_METHOD_PER_INDEX)
       simSettings << ", PER limit = " << drCalcPerLimit << ", PER Packet size = " << (unsigned)LoRaWANExampleTracing::m_perPacketSize << " bytes";
@@ -360,9 +372,9 @@ int main (int argc, char *argv[])
     // write settings to file:
     std::ostringstream simSettingsFileName;
     simSettingsFileName << simRunFilesPrefix.str() << "-sim-settings.txt";
-    std::ofstream out3 (simSettingsFileName.str ().c_str ());
-    out3 << simSettings.str();
-    out3.close ();
+    std::ofstream out5 (simSettingsFileName.str ().c_str ());
+    out5 << simSettings.str();
+    out5.close ();
 
     // Start sim run:
     LoRaWANExampleTracing example = LoRaWANExampleTracing ();
@@ -373,7 +385,7 @@ int main (int argc, char *argv[])
         usPacketSize, usDataPeriod, usConfirmedData,
         dsPacketSize, dsDataGenerate, dsDataExpMean, dsConfirmedData,
         verbose, stdcout, tracePhyTransmissions, tracePhyStates, traceMacPackets, traceMacStates,
-        phyTransmissionTraceCSVFileName.str (), phyStateTraceCSVFileName.str (), macPacketTraceCSVFileName.str (), macStateTraceCSVFileName.str ());
+        phyTransmissionTraceCSVFileName.str (), phyStateTraceCSVFileName.str (), macPacketTraceCSVFileName.str (), macStateTraceCSVFileName.str (), nodesCSVFileName.str());
   }
 
   return 0;
@@ -386,7 +398,7 @@ LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double
     uint32_t usPacketSize, double usDataPeriod, bool usConfirmedData,
     uint32_t dsPacketSize, bool dsDataGenerate, double dsDataExpMean, bool dsConfirmedData,
     bool verbose, bool stdcout, bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates,
-    std::string phyTransmissionTraceCSVFileName, std::string phyStateTraceCSVFileName, std::string macPacketTraceCSVFileName, std::string macStateTraceCSVFileName)
+    std::string phyTransmissionTraceCSVFileName, std::string phyStateTraceCSVFileName, std::string macPacketTraceCSVFileName, std::string macStateTraceCSVFileName, std::string nodesCSVFileName)
 {
   m_nEndDevices = nEndDevices;
   m_nGateways = nGateways;
@@ -409,12 +421,14 @@ LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double
   m_phyStateTraceCSVFileName = phyStateTraceCSVFileName;
   m_macPacketTraceCSVFileName = macPacketTraceCSVFileName;
   m_macStateTraceCSVFileName = macStateTraceCSVFileName;
+  m_nodesCSVFileName = nodesCSVFileName;
 
   CreateNodes ();
   SetupMobility (); // important: setup mobility before creating devices
   CreateDevices ();
   SetupTracing (tracePhyTransmissions, tracePhyStates, traceMacPackets, traceMacStates);
   InstallApplications ();
+  OutputNodesToFile ();
 
   std::cout << "Starting simulation for " << m_totalTime << " s ...\n";
 
@@ -557,6 +571,68 @@ LoRaWANExampleTracing::InstallApplications ()
 
       app->SetAttribute ("DataRateIndex", UintegerValue(dataRateIndex));
     }
+}
+
+void
+LoRaWANExampleTracing::OutputNodesToFile ()
+{
+  std::ofstream outNodes (m_nodesCSVFileName.c_str (), std::ios::app);
+  // Output For Gateways: nodeid, device type, x, y
+  for (NodeContainer::Iterator i = m_gatewayNodes.Begin (); i != m_gatewayNodes.End (); ++i)
+  {
+    Ptr<Node> node = *i;
+    Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (node->GetDevice (0));
+    Ptr<MobilityModel> gatewayMobility = node->GetObject<MobilityModel> ();
+    NS_ASSERT (gatewayMobility);
+    Vector gatewayPos = gatewayMobility->GetPosition ();
+
+    outNodes
+      << node->GetId () << ","
+      << netDevice->GetDeviceType () << ","
+      << gatewayPos.x << ","
+      << gatewayPos.y << std::endl;
+  }
+
+  // Output For End Devices: nodeid, device type, x, y, distancetoclosestgateway, datarateindex
+  for (NodeContainer::Iterator i = m_endDeviceNodes.Begin (); i != m_endDeviceNodes.End (); ++i)
+  {
+    Ptr<Node> node = *i;
+    Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (node->GetDevice (0));
+
+    Ptr<MobilityModel> endDeviceMobility = node->GetObject<MobilityModel> ();
+    NS_ASSERT (endDeviceMobility);
+    Vector endDevicePos = endDeviceMobility->GetPosition ();
+
+    // find distance to the closest gateway:
+    Vector closestGwPos; // to be determined
+    double dmin = std::numeric_limits<double>::max ();
+    {
+    for (NodeContainer::Iterator it_gw = m_gatewayNodes.Begin (); it_gw != m_gatewayNodes.End (); ++it_gw)
+    {
+      Ptr<MobilityModel> gatewayMobility = (*it_gw)->GetObject<MobilityModel> ();
+      NS_ASSERT (gatewayMobility);
+      Vector gwPos = gatewayMobility->GetPosition ();
+
+      double distance = CalculateDistance (endDevicePos, gwPos);
+      if (distance < dmin) {
+        dmin = distance;
+        closestGwPos = gwPos;
+      }
+    }
+    }
+
+    Ptr<LoRaWANEndDeviceApplication> edApp = node->GetApplication (0)->GetObject<LoRaWANEndDeviceApplication> ();
+    uint8_t dataRateIndex = edApp->GetDataRateIndex ();
+
+    outNodes
+      << node->GetId () << ","
+      << netDevice->GetDeviceType () << ","
+      << endDevicePos.x << ","
+      << endDevicePos.y << ","
+      << dmin << ","
+      << (uint32_t)dataRateIndex << std::endl;
+  }
+  outNodes.close ();
 }
 
 void
@@ -821,7 +897,6 @@ LoRaWANExampleTracing::LogOutputLine (std::string output, std::string fileName)
   }
   if (outputstream.is_open()) {
     outputstream << output;
-    //outputstream.close ();
   }
 }
 
@@ -868,7 +943,11 @@ LoRaWANExampleTracing::GeneratePhyTraceOutputLine (std::string traceSource, Ptr<
 void
 LoRaWANExampleTracing::PhyTxBegin (LoRaWANExampleTracing* example, Ptr<LoRaWANNetDevice> device, Ptr<LoRaWANPhy> phy, Ptr<const Packet> packet)
 {
-  std::ostringstream output = example->GeneratePhyTraceOutputLine ("PhyTxBegin", device, phy, packet);
+  std::ostringstream output = example->GeneratePhyTraceOutputLine ("PhyTxBegin", device, phy, packet, false);
+  // add channel and data rate index of Phy to output
+  uint8_t channelIndex = phy->GetCurrentChannelIndex ();
+  uint8_t dataRateIndex = phy->GetCurrentDataRateIndex ();;
+  output << "," << (uint32_t)channelIndex << "," << (uint32_t)dataRateIndex <<  std::endl;
   example->LogOutputLine (output.str (), example->m_phyTransmissionTraceCSVFileName);
 }
 
