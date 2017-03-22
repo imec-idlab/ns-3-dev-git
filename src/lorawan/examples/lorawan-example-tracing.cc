@@ -51,6 +51,13 @@
 
 using namespace ns3;
 
+typedef enum
+{
+  LORAWAN_DR_CALC_METHOD_PER_INDEX = 0x00,
+  LORAWAN_DR_CALC_METHOD_RANDOM_INDEX = 0x01,
+  LORAWAN_DR_CALC_METHOD_FIXED_INDEX = 0x02,
+} LoRaWANDataRateCalcMethodIndex;
+
 class LoRaWANExampleTracing
 {
 public:
@@ -96,16 +103,24 @@ public:
   static void PhyStateChangeNotification (LoRaWANExampleTracing* example, Ptr<LoRaWANNetDevice> device, Ptr<LoRaWANPhy> phy, LoRaWANPhyEnumeration oldState, LoRaWANPhyEnumeration newState);
   static void MacStateChangeNotification (LoRaWANExampleTracing* example, Ptr<LoRaWANNetDevice> device, Ptr<LoRaWANMac> mac, LoRaWANMacState oldState, LoRaWANMacState newState);
 
-  constexpr static const uint8_t m_perPacketSize = 1 + 8 + 8 + 4;
-  constexpr static const double m_perLimit = 0.01;
+  constexpr static const uint8_t m_perPacketSize = 1 + 8 + 8 + 4; // 1B MAC header, 8B frame header, 8 byte payload and 4B MIC
   uint8_t CalculateDataRateIndexPER (Ptr<Application> endDeviceApp);
   uint8_t CalculateRandomDataRateIndex (Ptr<Application> endDeviceApp);
   uint8_t CalculateFixedDataRateIndex (Ptr<Application> endDeviceApp);
+
+  void SelectDRCalculationMethod (LoRaWANDataRateCalcMethodIndex loRaWANDataRateCalcMethodIndex);
+  void SetDRCalcPerLimit (double drCalcPerLimit);
+  void SetDrCalcFixedDrIndex (uint8_t fixedDataRateIndex);
+
 private:
   uint32_t m_nEndDevices;
   uint32_t m_nGateways;
   double m_discRadius;
   double m_totalTime;
+
+  LoRaWANDataRateCalcMethodIndex m_drCalcMethodIndex;
+  double m_drCalcPerLimit;
+  uint8_t m_fixedDataRateIndex;
 
   uint32_t m_usPacketSize;
   double m_usDataPeriod; // <! Period between subsequent data transmission of end devices
@@ -156,6 +171,9 @@ int main (int argc, char *argv[])
   double discRadius = 5000.0;
   double totalTime = 600.0;
   uint32_t nRuns = 1;
+  uint32_t drCalcMethodIndex = 0;
+  double drCalcPerLimit = 0.01;
+  double drCalcFixedDRIndex = 0;
   uint32_t usPacketSize = 21;
   double usDataPeriod = 600.0;
   bool usConfirmedData = false;
@@ -178,6 +196,9 @@ int main (int argc, char *argv[])
   cmd.AddValue ("discRadius", "The radius of the disc (in meters) in which end devices and gateways are placed[Default:5000.0]", discRadius);
   cmd.AddValue ("totalTime", "Simulation time for one run in Seconds[Default:100]", totalTime);
   cmd.AddValue ("nRuns", "Number of simulation runs[Default:100]", nRuns);
+  cmd.AddValue ("drCalcMethodIndex", "Method to use for end device Data Rate calculation[Default:0]", drCalcMethodIndex);
+  cmd.AddValue ("drCalcPerLimit", "PER limit to use when using the PER Data Rate Calculation method (use index = 0)[Default:0.01]", drCalcPerLimit);
+  cmd.AddValue ("drCalcFixedDRIndex", "Fixed Data Rate index to assign when using the Fixed Data Rate Calculation method (use index = 2)[Default:0]", drCalcFixedDRIndex);
   cmd.AddValue ("usPacketSize", "Packet size used for generating US packets[Default:21]", usPacketSize);
   cmd.AddValue ("usDataPeriod", "Period between subsequent Upstream data transmissions from an end device[Default:600]", usDataPeriod);
   cmd.AddValue ("usConfirmedData", "0 for Unconfirmed Upstream Data MAC packets, 1 for Confirmed Upstream Data MAC Packets[Default:0]", usConfirmedData);
@@ -203,6 +224,18 @@ int main (int argc, char *argv[])
 
   if (dsDataExpMean == -1)
     dsDataExpMean = 10 * usDataPeriod; // set default value for dsDataExpMean
+
+  LoRaWANDataRateCalcMethodIndex loRaWANDataRateCalcMethodIndex;
+  if (drCalcMethodIndex == 0)
+    loRaWANDataRateCalcMethodIndex = LORAWAN_DR_CALC_METHOD_PER_INDEX;
+  else if (drCalcMethodIndex == 1)
+    loRaWANDataRateCalcMethodIndex = LORAWAN_DR_CALC_METHOD_RANDOM_INDEX;
+  else if (drCalcMethodIndex == 2)
+    loRaWANDataRateCalcMethodIndex = LORAWAN_DR_CALC_METHOD_FIXED_INDEX;
+  else {
+    std::cout << " Invalid Data Rate Calculcation Method index provided: " << (uint32_t)drCalcMethodIndex << std::endl;
+    return -1;
+  }
 
   std::time_t unix_epoch = std::time(nullptr);
   for (uint32_t i = 0; i < nRuns; i++) {
@@ -315,7 +348,13 @@ int main (int argc, char *argv[])
     simSettings << "\tphyStateTraceCSVFileName = " << phyStateTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacPacketTraceCSVFileName = " << macPacketTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacStateTraceCSVFileName = " << macStateTraceCSVFileName.str() << std::endl;
-    simSettings << "\tData rate assignment based on PER: PER limit = " << LoRaWANExampleTracing::m_perLimit << ", PER Packet size = " << (unsigned)LoRaWANExampleTracing::m_perPacketSize << " bytes" << std::endl;
+    simSettings << "\tData rate assignment method index: " << loRaWANDataRateCalcMethodIndex;
+    if (loRaWANDataRateCalcMethodIndex == LORAWAN_DR_CALC_METHOD_PER_INDEX)
+      simSettings << ", PER limit = " << drCalcPerLimit << ", PER Packet size = " << (unsigned)LoRaWANExampleTracing::m_perPacketSize << " bytes";
+    else if (loRaWANDataRateCalcMethodIndex == LORAWAN_DR_CALC_METHOD_FIXED_INDEX)
+      simSettings << ", Fixed Data Rate Index = " << drCalcFixedDRIndex;
+    simSettings  << std::endl;
+
     // print settings to std cout
     std::cout << simSettings.str();
     // write settings to file:
@@ -327,6 +366,9 @@ int main (int argc, char *argv[])
 
     // Start sim run:
     LoRaWANExampleTracing example = LoRaWANExampleTracing ();
+    example.SelectDRCalculationMethod (loRaWANDataRateCalcMethodIndex);
+    example.SetDRCalcPerLimit (drCalcPerLimit);
+    example.SetDrCalcFixedDrIndex (drCalcFixedDRIndex);
     example.CaseRun (nEndDevices, nGateways, discRadius, totalTime,
         usPacketSize, usDataPeriod, usConfirmedData,
         dsPacketSize, dsDataGenerate, dsDataExpMean, dsConfirmedData,
@@ -505,11 +547,50 @@ LoRaWANExampleTracing::InstallApplications ()
   for (ApplicationContainer::Iterator aci = endDeviceApp.Begin (); aci != endDeviceApp.End (); ++aci)
     {
       Ptr<Application> app = *aci;
-      uint8_t dataRateIndex = CalculateDataRateIndexPER (app); // assign data rates based on PER vs distance
-      //uint8_t dataRateIndex = CalculateFixedDataRateIndex (app); // use a fixed data rate
-      //uint8_t dataRateIndex = CalculateRandomDataRateIndex(app); // assign random data rates
+      uint8_t dataRateIndex = 0;
+      if (m_drCalcMethodIndex == LORAWAN_DR_CALC_METHOD_PER_INDEX)
+        dataRateIndex = CalculateDataRateIndexPER (app); // assign data rates based on PER vs distance
+      else if (m_drCalcMethodIndex == LORAWAN_DR_CALC_METHOD_RANDOM_INDEX)
+        dataRateIndex = CalculateRandomDataRateIndex(app); // assign random data rates
+      else if (m_drCalcMethodIndex == LORAWAN_DR_CALC_METHOD_FIXED_INDEX)
+        dataRateIndex = CalculateFixedDataRateIndex (app); // use a fixed data rate
+
       app->SetAttribute ("DataRateIndex", UintegerValue(dataRateIndex));
     }
+}
+
+void
+LoRaWANExampleTracing::SelectDRCalculationMethod (LoRaWANDataRateCalcMethodIndex loRaWANDataRateCalcMethodIndex)
+{
+  if (loRaWANDataRateCalcMethodIndex == 0)
+    this->m_drCalcMethodIndex = LORAWAN_DR_CALC_METHOD_PER_INDEX;
+  else if (loRaWANDataRateCalcMethodIndex == 1)
+    this->m_drCalcMethodIndex = LORAWAN_DR_CALC_METHOD_RANDOM_INDEX;
+  else if (loRaWANDataRateCalcMethodIndex == 2)
+    this->m_drCalcMethodIndex = LORAWAN_DR_CALC_METHOD_FIXED_INDEX;
+  else
+    std::cout << " Invalid Data Rate Calculcation Method index provided: " << (unsigned)loRaWANDataRateCalcMethodIndex << std::endl;
+}
+
+void
+LoRaWANExampleTracing::SetDRCalcPerLimit (double drCalcPerLimit)
+{
+  NS_ASSERT (drCalcPerLimit >= 0.0 && drCalcPerLimit <= 1.0);
+  if (drCalcPerLimit >= 0.0 && drCalcPerLimit <= 1.0)
+    this->m_drCalcPerLimit = drCalcPerLimit;
+  else
+    std::cout << " Invalid Data Rate PER Calculcation PER limit provided: " << drCalcPerLimit << std::endl;
+}
+
+void
+LoRaWANExampleTracing::SetDrCalcFixedDrIndex (uint8_t fixedDataRateIndex)
+{
+  if (fixedDataRateIndex < LoRaWAN::m_supportedDataRates.size() - 1)
+    this->m_fixedDataRateIndex = fixedDataRateIndex;
+  else {
+    std::cout << "LoRaWANExampleTracing::SetDrCalcFixedDrIndex: Invalid DR index provided: " << (uint32_t)fixedDataRateIndex << std::endl;
+    exit(-1);
+  }
 }
 
 uint8_t
@@ -578,7 +659,7 @@ LoRaWANExampleTracing::CalculateDataRateIndexPER (Ptr<Application> endDeviceApp)
     LoRaSpreadingFactor sf = it->spreadingFactor;
     perForDR = 1 - errorModel->GetChunkSuccessRate (snrDb, nbits, bandWidth, sf, codeRate);
 
-    if (perForDR <= m_perLimit) {
+    if (perForDR <= m_drCalcPerLimit) {
       calculatedDataRateIndex = it->dataRateIndex;
       hitPerLimit = true;
       break;
@@ -593,7 +674,8 @@ LoRaWANExampleTracing::CalculateDataRateIndexPER (Ptr<Application> endDeviceApp)
     << "\tmaxRxPowerdBm = " << maxRxPowerdBm << "dBm\tsnrDb = " << snrDb << "dB" << "\tpos=(" << endDevicePos.x << "," << endDevicePos.y << "\td=" << distance << "m" << std::endl;
 
   if (!hitPerLimit) { // this is just for debugging purposes
-    std::cout << "CalculateDataRateIndexPER: failed to find a data rate where the PER is lower than " << m_perLimit << ". Last calculated PER was equal to " << std::setiosflags (std::ios::fixed) << std::setprecision (9) << perForDR << std::endl;
+    std::cout << "CalculateDataRateIndexPER: failed to find a data rate where the PER is lower than " << m_drCalcPerLimit << "."
+      << "Last calculated PER was equal to " << std::setiosflags (std::ios::fixed) << std::setprecision (9) << perForDR << std::endl;
   }
 
   return calculatedDataRateIndex;
@@ -617,11 +699,11 @@ LoRaWANExampleTracing::CalculateFixedDataRateIndex (Ptr<Application> endDeviceAp
 {
   const Ptr<Node> endDeviceNode = endDeviceApp->GetNode ();
 
-  uint8_t calculatedDataRateIndex = 0;
+  uint8_t calculatedDataRateIndex = m_fixedDataRateIndex;
   std::cout << "CalculateFixedDataRateIndex: node " << endDeviceNode->GetId () << "\tDRindex = " << (unsigned int)calculatedDataRateIndex
     << "\tSF=" << (unsigned int)LoRaWAN::m_supportedDataRates[calculatedDataRateIndex].spreadingFactor << std::endl;
 
-  return calculatedDataRateIndex; // SF12
+  return calculatedDataRateIndex;
 }
 
 void
