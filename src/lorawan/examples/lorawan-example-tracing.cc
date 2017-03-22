@@ -99,7 +99,8 @@ public:
   constexpr static const uint8_t m_perPacketSize = 1 + 8 + 8 + 4;
   constexpr static const double m_perLimit = 0.01;
   uint8_t CalculateDataRateIndexPER (Ptr<Application> endDeviceApp);
-  uint8_t FixedDataRate (Ptr<Application> endDeviceApp);
+  uint8_t CalculateRandomDataRateIndex (Ptr<Application> endDeviceApp);
+  uint8_t CalculateFixedDataRateIndex (Ptr<Application> endDeviceApp);
 private:
   uint32_t m_nEndDevices;
   uint32_t m_nGateways;
@@ -121,6 +122,7 @@ private:
   std::string m_phyStateTraceCSVFileName;
   std::string m_macPacketTraceCSVFileName;
   std::string m_macStateTraceCSVFileName;
+  std::map<std::string, std::ofstream> output_streams;
 
   //std::string m_rate;
   //std::string m_phyMode;
@@ -475,6 +477,7 @@ LoRaWANExampleTracing::InstallApplications ()
   ApplicationContainer endDeviceApp;
   ObjectFactory m_factory; //!< Object factory.
   m_factory.SetTypeId ("ns3::LoRaWANEndDeviceApplication");
+  // Attributes shared by all end device apps:
   m_factory.Set ("PacketSize", UintegerValue (m_usPacketSize));
   m_factory.Set ("ConfirmedDataUp", BooleanValue (m_usConfirmdData));
   std::stringstream upstreamiatss;
@@ -490,14 +493,9 @@ LoRaWANExampleTracing::InstallApplications ()
       Ptr<Application> app = m_factory.Create<Application> ();
       node->AddApplication (app);
 
-      // app->SetAttribute ("PacketSize", UintegerValue (m_usPacketSize));
-      // app->SetAttribute ("ConfirmedDataUp", BooleanValue (m_usConfirmdData));
-      // std::stringstream upstreamiatss;
-      // upstreamiatss << "ns3::ConstantRandomVariable[Constant=" << m_usDataPeriod << "]";
-      // app->SetAttribute ("UpstreamIAT", StringValue (upstreamiatss.str ()));
-
       // Start the end device apps at different times:
-      app->SetStartTime (Seconds (appStartRandomVariable->GetValue (0, m_usDataPeriod)));
+      double appStartRandomValue = appStartRandomVariable->GetValue (0, m_usDataPeriod);
+      app->SetStartTime (Seconds (appStartRandomValue));
       app->SetStopTime(Seconds (m_totalTime));
 
       endDeviceApp.Add (app);
@@ -507,8 +505,9 @@ LoRaWANExampleTracing::InstallApplications ()
   for (ApplicationContainer::Iterator aci = endDeviceApp.Begin (); aci != endDeviceApp.End (); ++aci)
     {
       Ptr<Application> app = *aci;
-      uint8_t dataRateIndex = CalculateDataRateIndexPER (app);
-      //uint8_t dataRateIndex = FixedDataRate (app); // use a fixed data rate
+      uint8_t dataRateIndex = CalculateDataRateIndexPER (app); // assign data rates based on PER vs distance
+      //uint8_t dataRateIndex = CalculateFixedDataRateIndex (app); // use a fixed data rate
+      //uint8_t dataRateIndex = CalculateRandomDataRateIndex(app); // assign random data rates
       app->SetAttribute ("DataRateIndex", UintegerValue(dataRateIndex));
     }
 }
@@ -569,34 +568,60 @@ LoRaWANExampleTracing::CalculateDataRateIndexPER (Ptr<Application> endDeviceApp)
   uint8_t codeRate = 3;
   uint8_t calculatedDataRateIndex = LoRaWAN::m_supportedDataRates[0].dataRateIndex; // SF12 will be default SF
 
-  auto it = LoRaWAN::m_supportedDataRates.rbegin();
+  bool hitPerLimit = false; // check whether we actually get a per below the perLimit
+  double perForDR = 0.0;
+  auto it = LoRaWAN::m_supportedDataRates.rbegin(); // iterate in reverse, so that we start at SF7 and move upto SF12
   it++; // skip the 250kHz data rate
   for (; it != LoRaWAN::m_supportedDataRates.rend (); it++)
   {
     uint32_t bandWidth = it->bandWith;
     LoRaSpreadingFactor sf = it->spreadingFactor;
-    double per = 1 - errorModel->GetChunkSuccessRate (snrDb, nbits, bandWidth, sf, codeRate);
+    perForDR = 1 - errorModel->GetChunkSuccessRate (snrDb, nbits, bandWidth, sf, codeRate);
 
-    if (per <= m_perLimit) {
+    if (perForDR <= m_perLimit) {
       calculatedDataRateIndex = it->dataRateIndex;
+      hitPerLimit = true;
       break;
     }
   }
 
   Vector endDevicePos = endDeviceMobility->GetPosition ();
   double distance = CalculateDistance (endDeviceMobility->GetPosition (), posGw);
+
   std::cout << "CalculateDataRateIndexPER: node " << endDeviceNode->GetId () << "\tDRindex = " << (unsigned int)calculatedDataRateIndex
     << "\tSF=" << (unsigned int)LoRaWAN::m_supportedDataRates[calculatedDataRateIndex].spreadingFactor
-    << "\tmaxRxPowerdBm = " << maxRxPowerdBm << "dBm\tsnrDb = " << snrDb << "dB" << "\t(" << endDevicePos.x << "," << endDevicePos.y << "," << distance << ")" <<std::endl;
+    << "\tmaxRxPowerdBm = " << maxRxPowerdBm << "dBm\tsnrDb = " << snrDb << "dB" << "\tpos=(" << endDevicePos.x << "," << endDevicePos.y << "\td=" << distance << "m" << std::endl;
+
+  if (!hitPerLimit) { // this is just for debugging purposes
+    std::cout << "CalculateDataRateIndexPER: failed to find a data rate where the PER is lower than " << m_perLimit << ". Last calculated PER was equal to " << std::setiosflags (std::ios::fixed) << std::setprecision (9) << perForDR << std::endl;
+  }
 
   return calculatedDataRateIndex;
 }
 
 uint8_t
-LoRaWANExampleTracing::FixedDataRate (Ptr<Application> endDeviceApp)
+LoRaWANExampleTracing::CalculateRandomDataRateIndex (Ptr<Application> endDeviceApp)
 {
-  // return 0; // SF12
-  return 4; // SF12
+  const Ptr<Node> endDeviceNode = endDeviceApp->GetNode ();
+
+  Ptr<UniformRandomVariable> dataRateRandomVariable = CreateObject<UniformRandomVariable> ();
+  uint8_t calculatedDataRateIndex = dataRateRandomVariable->GetInteger (0, LoRaWAN::m_supportedDataRates.size() - 2);
+  std::cout << "CalculateRandomDataRateIndex: node " << endDeviceNode->GetId () << "\tDRindex = " << (unsigned int)calculatedDataRateIndex
+    << "\tSF=" << (unsigned int)LoRaWAN::m_supportedDataRates[calculatedDataRateIndex].spreadingFactor << std::endl;
+
+  return calculatedDataRateIndex;
+}
+
+uint8_t
+LoRaWANExampleTracing::CalculateFixedDataRateIndex (Ptr<Application> endDeviceApp)
+{
+  const Ptr<Node> endDeviceNode = endDeviceApp->GetNode ();
+
+  uint8_t calculatedDataRateIndex = 0;
+  std::cout << "CalculateFixedDataRateIndex: node " << endDeviceNode->GetId () << "\tDRindex = " << (unsigned int)calculatedDataRateIndex
+    << "\tSF=" << (unsigned int)LoRaWAN::m_supportedDataRates[calculatedDataRateIndex].spreadingFactor << std::endl;
+
+  return calculatedDataRateIndex; // SF12
 }
 
 void
@@ -708,9 +733,14 @@ LoRaWANExampleTracing::LogOutputLine (std::string output, std::string fileName)
   if (this->m_stdcout)
     std::cout << output;
 
-  std::ofstream out (fileName.c_str (), std::ios::app);
-  out << output;
-  out.close ();
+  std::ofstream & outputstream = output_streams[fileName];   // creates the stream object and returns reference
+  if (!outputstream.is_open()) {
+    outputstream.open(fileName.c_str(), std::ios::app);
+  }
+  if (outputstream.is_open()) {
+    outputstream << output;
+    //outputstream.close ();
+  }
 }
 
 std::ostringstream
