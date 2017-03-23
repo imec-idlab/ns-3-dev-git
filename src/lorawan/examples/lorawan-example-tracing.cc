@@ -733,7 +733,8 @@ LoRaWANExampleTracing::CalculateDataRateIndexPER (Ptr<Application> endDeviceApp)
   {
     uint32_t bandWidth = it->bandWith;
     LoRaSpreadingFactor sf = it->spreadingFactor;
-    perForDR = 1 - errorModel->GetChunkSuccessRate (snrDb, nbits, bandWidth, sf, codeRate);
+    perForDR = 1.0 - errorModel->GetChunkSuccessRate (snrDb, nbits, bandWidth, sf, codeRate);
+    NS_ASSERT (perForDR >= 0.0 && perForDR <= 1.0);
 
     if (perForDR <= m_drCalcPerLimit) {
       calculatedDataRateIndex = it->dataRateIndex;
@@ -748,7 +749,7 @@ LoRaWANExampleTracing::CalculateDataRateIndexPER (Ptr<Application> endDeviceApp)
   if (m_verbose) {
     std::cout << "CalculateDataRateIndexPER: node " << endDeviceNode->GetId () << "\tDRindex = " << (unsigned int)calculatedDataRateIndex
       << "\tSF=" << (unsigned int)LoRaWAN::m_supportedDataRates[calculatedDataRateIndex].spreadingFactor
-      << "\tmaxRxPowerdBm = " << maxRxPowerdBm << "dBm\tsnrDb = " << snrDb << "dB" << "\tpos=(" << endDevicePos.x << "," << endDevicePos.y << "\td=" << distance << "m" << std::endl;
+      << "\tmaxRxPowerdBm = " << maxRxPowerdBm << "dBm\tsnrDb = " << snrDb << "dB" << "\tpos=(" << endDevicePos.x << "," << endDevicePos.y << ")\td=" << distance << "m\tPER=" << std::setprecision(5) << perForDR*100 << "%" << std::endl;
 
     if (!hitPerLimit) { // this is just for debugging purposes
       std::cout << "CalculateDataRateIndexPER: failed to find a data rate where the PER is lower than " << m_drCalcPerLimit << "."
