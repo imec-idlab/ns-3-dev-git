@@ -326,7 +326,7 @@ protected:
 
   void CheckQueue ();
   void CheckRetransmission ();
-  void RemoveFirstTxQElement ();
+  void RemoveFirstTxQElement (bool sentPacket);
 
   bool ConfigurePhyForTX ();
 

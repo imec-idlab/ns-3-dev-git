@@ -496,7 +496,7 @@ LoRaWANMac::PdDataIndication (uint32_t phyPayloadLength, Ptr<Packet> p, uint8_t 
 
           // Remove TX frame from queue
           NS_LOG_DEBUG( this << " Received Ack, removing packet from queue.");
-          RemoveFirstTxQElement ();
+          RemoveFirstTxQElement (true);
         } else {
           NS_LOG_ERROR ( this << " Received Ack but do not have a frame queued for delivery." );
         }
@@ -629,16 +629,16 @@ LoRaWANMac::PdDataConfirm (LoRaWANPhyEnumeration status)
 
         // We don't need to retransmit the packet, so we can remove it from our queue
         NS_LOG_DEBUG (this << " Sent packet, removing packet from queue.");
-        RemoveFirstTxQElement ();
+        RemoveFirstTxQElement (true);
       } else {
         if (m_deviceType == LORAWAN_DT_END_DEVICE_CLASS_A) {
-        // For confirmed messages, decrease the number of transmissions
-        NS_ASSERT (txQElement->lorawanDataRequestParams.m_numberOfTransmissions > 0);
-        NS_LOG_DEBUG( this << " Decreasing number of transmission for packet from " << static_cast<int> (txQElement->lorawanDataRequestParams.m_numberOfTransmissions) << " to " << static_cast<int> (txQElement->lorawanDataRequestParams.m_numberOfTransmissions) - 1);
-        txQElement->lorawanDataRequestParams.m_numberOfTransmissions--;
+          // For confirmed messages, decrease the number of transmissions
+          NS_ASSERT (txQElement->lorawanDataRequestParams.m_numberOfTransmissions > 0);
+          NS_LOG_DEBUG( this << " Decreasing number of transmission for packet from " << static_cast<int> (txQElement->lorawanDataRequestParams.m_numberOfTransmissions) << " to " << static_cast<int> (txQElement->lorawanDataRequestParams.m_numberOfTransmissions) - 1);
+          txQElement->lorawanDataRequestParams.m_numberOfTransmissions--;
         } else if (m_deviceType == LORAWAN_DT_GATEWAY) {
           // As retransmissions are handled by the network server, it does not make sense to keep the packet in the queue on this gateway MAC
-          RemoveFirstTxQElement ();
+          RemoveFirstTxQElement (true);
         } else {
           NS_FATAL_ERROR ( this << " Invalid device type " << m_deviceType);
           return;
@@ -807,7 +807,7 @@ LoRaWANMac::CheckQueue ()
   if (m_deviceType == LORAWAN_DT_GATEWAY) {
     if (!m_txQueue.empty ()) {
       NS_LOG_WARN (this << " Gateway is unable to send packet immediately, aborting packet transmission.");
-      this->RemoveFirstTxQElement ();
+      this->RemoveFirstTxQElement (false);
     }
   }
 }
@@ -839,7 +839,7 @@ LoRaWANMac::CheckRetransmission ()
       }
 
       NS_LOG_DEBUG (this << " Confirmed packet has reached zero transmissions, removing packet from queue.");
-      RemoveFirstTxQElement ();
+      RemoveFirstTxQElement (false);
 
       // We can recheck the queue in case any other frames are waiting
       CheckQueue ();
@@ -865,14 +865,15 @@ LoRaWANMac::CheckRetransmission ()
 }
 
 void
-LoRaWANMac::RemoveFirstTxQElement ()
+LoRaWANMac::RemoveFirstTxQElement (bool sentPacket)
 {
   NS_LOG_FUNCTION (this);
 
   TxQueueElement *txQElement = m_txQueue.front ();
   Ptr<const Packet> p = txQElement->txQPkt;
 
-  m_sentPktTrace (p, m_retransmission + 1);
+  if (sentPacket)
+    m_sentPktTrace (p, m_retransmission + 1);
 
   txQElement->txQPkt = 0;
   delete txQElement;

@@ -26,6 +26,7 @@
 #include "ns3/ptr.h"
 #include "ns3/data-rate.h"
 #include "ns3/traced-callback.h"
+#include "ns3/traced-value.h"
 #include "ns3/simple-ref-count.h"
 #include "ns3/random-variable-stream.h"
 #include <unordered_map>
@@ -102,6 +103,7 @@ public:
   void RW1TimerExpired (uint32_t deviceAddr);
   void RW2TimerExpired (uint32_t deviceAddr);
   void SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayApplication> gatewayPtr, bool RW1, bool RW2);
+  bool HaveSomethingToSendToEndDevice (uint32_t deviceAddr);
   void DSTimerExpired (uint32_t deviceAddr);
 
   int64_t AssignStreams (int64_t stream);
@@ -114,6 +116,8 @@ private:
   bool m_generateDataDown;
   bool m_confirmedData;
   Ptr<RandomVariableStream> m_downstreamIATRandomVariable;
+  TracedValue<uint32_t> m_nrRW1Missed; // number of times that RW1 was missed for all end devices served by this NS
+  TracedValue<uint32_t> m_nrRW2Missed; // number of times that RW2 was missed for all end devices served by this NS
 };
 
 /**

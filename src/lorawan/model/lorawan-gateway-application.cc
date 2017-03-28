@@ -49,7 +49,7 @@ NS_OBJECT_ENSURE_REGISTERED (LoRaWANGatewayApplication);
 
 Ptr<LoRaWANNetworkServer> LoRaWANNetworkServer::m_ptr = NULL;
 
-LoRaWANNetworkServer::LoRaWANNetworkServer () {}
+LoRaWANNetworkServer::LoRaWANNetworkServer () : m_nrRW1Missed(0), m_nrRW2Missed(0) {}
 
 TypeId
 LoRaWANNetworkServer::GetTypeId (void)
@@ -81,6 +81,14 @@ LoRaWANNetworkServer::GetTypeId (void)
 //    .AddTraceSource ("Tx", "A new packet is created and is sent",
 //                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_txTrace),
 //                     "ns3::Packet::TracedCallback")
+    .AddTraceSource ("nrRW1Missed",
+                     "The number of times RW1 was missed for all end devics served by this network server",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_nrRW1Missed),
+                     "ns3::TracedValueCallback::Uint32")
+    .AddTraceSource ("nrRW2Missed",
+                     "The number of times RW2 was missed for all end devics served by this network server",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_nrRW2Missed),
+                     "ns3::TracedValueCallback::Uint32")
   ;
   return tid;
 }
@@ -130,6 +138,7 @@ LoRaWANNetworkServer::InitEndDeviceInfo (Ipv4Address ipv4DevAddr)
   LoRaWANEndDeviceInfoNS info;
   info.m_deviceAddress = ipv4DevAddr;
   info.m_rx1DROffset = 0; // default
+  info.m_setAck = false;
 
   if (m_generateDataDown) {
     Time t = Seconds (this->m_downstreamIATRandomVariable->GetValue ());
@@ -263,6 +272,15 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
   it->second.m_rw1Timer = Simulator::Schedule (receiveDelay, &LoRaWANNetworkServer::RW1TimerExpired, this, key);
 }
 
+bool
+LoRaWANNetworkServer::HaveSomethingToSendToEndDevice (uint32_t deviceAddr)
+{
+  uint32_t key = deviceAddr;
+  auto it_ed = m_endDevices.find (key);
+
+  return it_ed->second.m_downstreamQueue.size() > 0 || it_ed->second.m_setAck;
+}
+
 void
 LoRaWANNetworkServer::RW1TimerExpired (uint32_t deviceAddr)
 {
@@ -284,9 +302,16 @@ LoRaWANNetworkServer::RW1TimerExpired (uint32_t deviceAddr)
 
   if (!foundGW) {
     NS_LOG_DEBUG (this << " No gateway available for transmission in RW1, scheduling timer for DS transmission in RW2");
+
+    // Increment m_nrRW1Missed only if there is something to send:
+    if (HaveSomethingToSendToEndDevice (deviceAddr)) {
+      m_nrRW1Missed++;
+    }
+
     if (it_ed->second.m_rw2Timer.IsRunning()) {
       NS_LOG_ERROR (this << " Scheduling RW2 timer while RW2 timer was already scheduled for " << it_ed->second.m_rw2Timer.GetTs ());
     }
+
     // Time receiveDelay = MicroSeconds (RECEIVE_DELAY2);
     Time receiveDelay = (it_ed->second.m_lastSeen + MicroSeconds (RECEIVE_DELAY2)) - Simulator::Now ();
     NS_ASSERT (receiveDelay > 0);
@@ -314,7 +339,11 @@ LoRaWANNetworkServer::RW2TimerExpired (uint32_t deviceAddr)
   }
 
   if (!foundGW) {
-    NS_LOG_INFO (this << " Unable to send DS transmission to device addr " << deviceAddr << " in RW1 and RW2, no gateway was available.");
+    // Increment m_nrRW2Missed only if there is something to send:
+    if (HaveSomethingToSendToEndDevice (deviceAddr)) {
+      m_nrRW2Missed++;
+      NS_LOG_INFO (this << " Unable to send DS transmission to device addr " << deviceAddr << " in RW1 and RW2, no gateway was available.");
+    }
   }
 }
 
@@ -568,7 +597,8 @@ LoRaWANGatewayApplication::DoInitialize (void)
 
   this->m_lorawanNSPtr = LoRaWANNetworkServer::getLoRaWANNetworkServerPointer ();
 
-  Object::DoInitialize ();
+  // chain up
+  Application::DoInitialize ();
 }
 
 void
