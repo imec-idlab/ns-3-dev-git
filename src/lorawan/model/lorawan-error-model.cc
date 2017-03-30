@@ -193,13 +193,13 @@ LoRaWANErrorModel::getSNRCutoffForRX (uint32_t bandWidth, LoRaSpreadingFactor sp
     } else if (codeRate == 3) {
       return -20.5581;
     }
-  } else if (spreadingFactor == LORAWAN_SF11) { // TODO: update with simulations for SF11
+  } else if (spreadingFactor == LORAWAN_SF11) {
     if (codeRate == 1) {
       return -22.7568;
     } else if (codeRate == 3) {
       return -23.1791;
     }
-  } else if (spreadingFactor == LORAWAN_SF12) { // TODO: update with simulations for SF12
+  } else if (spreadingFactor == LORAWAN_SF12) {
     if (codeRate == 1) {
       return -25.6243;
     } else if (codeRate == 3) {
