@@ -323,7 +323,7 @@ LoRaWANMac::SetLoRaWANMacState (LoRaWANMacState macState)
         // the node missed the start of RW2 (e.g. a long packet was received in RW1 but was dropped after or during reception)
         // TODO: what to do?
         // For now try to continue gracefully by switching mac state to RW2 and immediately calling OpenRW() and CloseRW()
-        NS_LOG_WARN (this << " missed start of RW2");
+        NS_LOG_WARN (this << " MAC missed the start of RW2");
         ChangeMacState (MAC_RW2);
         OpenRW ();
         CloseRW ();
@@ -334,7 +334,7 @@ LoRaWANMac::SetLoRaWANMacState (LoRaWANMacState macState)
 
       ChangeMacState (macState);
       OpenRW ();
-  } else if (macState == MAC_ACK_TIMEOUT) {
+  } else if (macState == MAC_ACK_TIMEOUT) { // in this state the MAC is waiting for the Mac Ack timeout timer (m_ackTimeOut) to expire
       NS_ASSERT (m_LoRaWANMacState == MAC_TX || m_LoRaWANMacState == MAC_RW2); // MAC_TX for non Class devices
 
       ChangeMacState (macState);
@@ -986,10 +986,6 @@ LoRaWANMac::OpenRW ()
 
     // For confirmed frames, start the ACK_TIMEOUT timer at the beginning of RW2
     if (m_txPkt) { // if the transmitted packet was unconfirmed, then it has been removed in RemoveFirstTxQElement which set m_txPkt to NULL
-      std::ostringstream os;
-      m_txPkt->Print (os);
-      NS_LOG_DEBUG (this << " " << os.str () );
-
       LoRaWANMacHeader macHdr;
       m_txPkt->PeekHeader (macHdr);
       if (macHdr.IsConfirmed ()) {
@@ -1041,7 +1037,15 @@ LoRaWANMac::CloseRW ()
     if (confirmed) {
       // We didn't receive a frame in RW2, so assume that no Ack is comming: go to MAC_ACK_TIMEOUT state
       // Note that the Ack Timeout timer was started at the beginning of RW2
-      m_setMacState = Simulator::ScheduleNow (&LoRaWANMac::SetLoRaWANMacState, this, MAC_ACK_TIMEOUT);
+      // Also note that in some cases the RW might only be closed after the Ack timeout timer has already
+      // expired (e.g. due to a long packet reception and a short ack timeout time interval),
+      // in these cases just go immediatly to MAC_IDLE
+      if (m_ackTimeOut.IsRunning ()) {
+        m_setMacState = Simulator::ScheduleNow (&LoRaWANMac::SetLoRaWANMacState, this, MAC_ACK_TIMEOUT);
+      } else {
+        NS_LOG_WARN (this << " Closing RW2 after Ack Timeout timer has expired. Skipping MAC_ACK_TIMEOUT state and going directly to MAC_IDLE state.");
+        m_setMacState = Simulator::ScheduleNow (&LoRaWANMac::SetLoRaWANMacState, this, MAC_IDLE);
+      }
     } else {
       m_setMacState = Simulator::ScheduleNow (&LoRaWANMac::SetLoRaWANMacState, this, MAC_IDLE);
     }
@@ -1063,15 +1067,16 @@ LoRaWANMac::CheckPhyPreamble ()
   NS_LOG_FUNCTION (this);
 
   if (m_phy->preambleDetected ()) {
-    // Disable Ack Timeout Timer ?
     // Keep on receiving the Frame, so do nothing for now.
     // Phy should contact MAC once it has finished receiving the frame
+    // Either
+    // 1) The frame was succesfully received by the phy and phy calls data indication callback (where MAC might or might not accept the frame) or
+    // 2) The frame was destroyed during reception (e.g. due to interference) and phy calls data destroyed callback (allowing MAC to handle this)
   } else {
     // No ongoing transmission, in case we are in RW1 or RW2 state. Close RW
     if (m_LoRaWANMacState == MAC_RW1 || m_LoRaWANMacState == MAC_RW2) {
       CloseRW ();
     }
-
   }
 }
 
@@ -1104,7 +1109,7 @@ LoRaWANMac::AckTimeoutExpired ()
   NS_LOG_FUNCTION (this);
 
   // Timer should only expire when MAC is in:
-  // MAC_RW2: the timer expired before we finished receiving a frame in RW2, in this case AckTimeoutExpired should do nothing. PdDataIndication will switch the MAC state to IDLE
+  // MAC_RW2: the timer expired before we finished receiving a frame in RW2, in this case AckTimeoutExpired should do nothing. PdDataIndication/PdDataDestroyed will switch the MAC state to IDLE
   // MAC_ACK_TIMEOUT state: the timer expired after we closed RW2 -> switch state to MAC_IDLE
   NS_ASSERT (m_LoRaWANMacState == MAC_RW2 ||  m_LoRaWANMacState == MAC_ACK_TIMEOUT);
 
