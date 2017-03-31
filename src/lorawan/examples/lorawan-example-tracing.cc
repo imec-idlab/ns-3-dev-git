@@ -497,12 +497,44 @@ LoRaWANExampleTracing::SetupMobility ()
   edMobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   edMobility.Install (m_endDeviceNodes);
 
-  // TODO: for now install all gateways in center of disc
   MobilityHelper gwMobility;
   Ptr<ListPositionAllocator> nodePositionList = CreateObject<ListPositionAllocator> ();
   for (uint32_t i = 0; i < m_nGateways; i++) {
-    nodePositionList->Add (Vector (0.0, 0.0, 0.0));  // gateway
+    Vector v;
+    if (m_nGateways == 1) {
+      v = Vector (0.0, 0.0, 0.0); // place gateway in center
+    } else if (m_nGateways == 2) {
+      v = Vector (-m_discRadius/2 + i*m_discRadius, 0.0, 0.0);  // place gateways on (-discRadius/2, 0) and (discRadius/2, 0)
+    } else if (m_nGateways == 4) {
+      // place gateways on (-discRadius/2, -discRadius/2) and (discRadius/2, -discRadius/2) and (-discRadius/2, discRadius/2) and (discRadius/2, discRadius/2)
+      v = Vector (-m_discRadius/2 + (i/2)*m_discRadius, -m_discRadius/2 + (i % 2)*m_discRadius, 0.0);
+    // } else if (m_nGateways == 9) {
+    //   if (i < 4) {
+    //     // place four gateways on (-discRadius/2, -discRadius/2) and (discRadius/2, -discRadius/2) and (-discRadius/2, discRadius/2) and (discRadius/2, discRadius/2)
+    //     v = Vector (-m_discRadius/2 + (i/2)*m_discRadius, -m_discRadius/2 + (i % 2)*m_discRadius, 0.0);
+    //   } else if (i == 4) {
+    //     // place one gateways in center
+    //     v = Vector (0.0, 0.0, 0.0); // place gateway in center
+    //   } else {
+    //     // place four gateways on (-discRadius, 0) and (discRadius, 0) and (0, discRadius) and (0, -discRadius)
+    //     if (i == 5) {
+    //       v = Vector (-m_discRadius, 0.0, 0.0);
+    //     } else if (i == 6) {
+    //       v = Vector (m_discRadius, 0.0, 0.0);
+    //     } else if (i == 7) {
+    //       v = Vector (0.0, m_discRadius, 0.0);
+    //     } else if (i == 8) {
+    //       v = Vector (0.0, -m_discRadius, 0.0);
+    //     }
+    //   }
+    } else {
+      NS_FATAL_ERROR (this << " " << m_nGateways << " number of gateways is not supported");
+      exit (-1);
+    }
+
+    nodePositionList->Add (v);
   }
+
   gwMobility.SetPositionAllocator (nodePositionList);
   gwMobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   gwMobility.Install (m_gatewayNodes);
