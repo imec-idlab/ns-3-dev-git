@@ -94,6 +94,7 @@ public:
   virtual void DoDispose (void);
 
   static void clearLoRaWANNetworkServerPointer () { LoRaWANNetworkServer::m_ptr = nullptr; }
+  static bool haveLoRaWANNetworkServerObject () { return LoRaWANNetworkServer::m_ptr != NULL; }
   static Ptr<LoRaWANNetworkServer> getLoRaWANNetworkServerPointer ();
 
   void SetConfirmedDataDown (bool confirmedData);

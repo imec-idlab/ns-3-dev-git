@@ -611,7 +611,8 @@ LoRaWANGatewayApplication::DoDispose (void)
   // clear ref count in static member, as to destroy the LoRaWANNetworkServer object.
   // Note we should only destroy the NS object when the simulation is stopped and all gateway applications are destroyed.
   // So we assume that a gateway is not destroyed before the end of the simulation
-  if (LoRaWANNetworkServer::getLoRaWANNetworkServerPointer ())
+
+  if (LoRaWANNetworkServer::haveLoRaWANNetworkServerObject ())
     LoRaWANNetworkServer::clearLoRaWANNetworkServerPointer ();
 
   // chain up
