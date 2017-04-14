@@ -1168,8 +1168,9 @@ LoRaWANMac::LoRaWANMacRDC::IsSubBandAvailable (uint8_t subBandIndex) const
   // For non-zero timeoff check whether enough simtime has expired for this sub band to become available again
   Time simTime = Simulator::Now ();
 
-  //NS_LOG_LOGIC (this  << " Is " << simTime << " greater than the sum of " << m_subBands[subBandIndex].LastTxFinishedTimestamp << " AND " << m_subBands[subBandIndex].timeoff);
-  return simTime >= (m_subBands[subBandIndex].LastTxFinishedTimestamp + m_subBands[subBandIndex].timeoff);
+  bool result = simTime >= (m_subBands[subBandIndex].LastTxFinishedTimestamp + m_subBands[subBandIndex].timeoff);
+  NS_LOG_LOGIC (this << " Is " << simTime << " greater than the sum of " << m_subBands[subBandIndex].LastTxFinishedTimestamp << " AND " << m_subBands[subBandIndex].timeoff << "(subbandindex=" << (uint32_t)subBandIndex << "): " << result);
+  return result;
 }
 
 void
