@@ -106,7 +106,15 @@ LoRaWANNetworkServer::DoInitialize (void)
 {
   NS_LOG_FUNCTION (this);
 
+  Object::DoInitialize ();
+}
+
+void
+LoRaWANNetworkServer::PopulateEndDevices (void)
+{
   // Populate m_endDevices based on ns3::NodeList
+  m_endDevices.clear ();
+
   for (NodeList::Iterator it = NodeList::Begin (); it != NodeList::End (); ++it)
   {
     Ptr<Node> nodePtr(*it);
@@ -125,8 +133,6 @@ LoRaWANNetworkServer::DoInitialize (void)
       continue;
     }
   }
-
-  Object::DoInitialize ();
 }
 
 void
@@ -728,6 +734,10 @@ void LoRaWANGatewayApplication::StartApplication () // Called at time specified 
       m_socket->SetRecvCallback (MakeCallback (&LoRaWANGatewayApplication::HandleRead, this));
 
     }
+
+  // instruct Network Server to populate end devices data structure:
+  // NOTE that we call PopulateEndDevices in StartApplication and not in DoInitialize as the attributes for the NetworkServer object have not yet been set at the of DoInitialize()
+  this->m_lorawanNSPtr->PopulateEndDevices ();
 }
 
 void LoRaWANGatewayApplication::StopApplication () // Called at time specified by Stop

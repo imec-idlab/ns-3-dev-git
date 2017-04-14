@@ -93,6 +93,9 @@ public:
   virtual void DoInitialize (void);
   virtual void DoDispose (void);
 
+  void PopulateEndDevices (void);
+  LoRaWANEndDeviceInfoNS InitEndDeviceInfo (Ipv4Address);
+
   static void clearLoRaWANNetworkServerPointer () { LoRaWANNetworkServer::m_ptr = nullptr; }
   static bool haveLoRaWANNetworkServerObject () { return LoRaWANNetworkServer::m_ptr != NULL; }
   static Ptr<LoRaWANNetworkServer> getLoRaWANNetworkServerPointer ();
@@ -108,8 +111,6 @@ public:
   void DSTimerExpired (uint32_t deviceAddr);
 
   int64_t AssignStreams (int64_t stream);
-
-  LoRaWANEndDeviceInfoNS InitEndDeviceInfo (Ipv4Address);
 private:
   static Ptr<LoRaWANNetworkServer> m_ptr;
   std::unordered_map <uint32_t, LoRaWANEndDeviceInfoNS> m_endDevices;
