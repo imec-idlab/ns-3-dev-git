@@ -299,10 +299,11 @@ LoRaWANNetworkServer::RW1TimerExpired (uint32_t deviceAddr)
 
   // Check whether any GW in lastGWs can send a downstream transmission immediately (i.e. right now) in RW1
   bool foundGW = false;
-  // The RW1 LoRa channel is the same channel as the last US transmission
-  uint8_t dsChannelIndex = it_ed->second.m_lastChannelIndex;
+  // The RW1 LoRa channel and data rate are the same as used in the last US transmission
+  const uint8_t dsChannelIndex = it_ed->second.m_lastChannelIndex;
+  const uint8_t dsDataRateIndex = it_ed->second.m_lastDataRateIndex;;
   for (auto it_gw = it_ed->second.m_lastGWs.cbegin(); it_gw != it_ed->second.m_lastGWs.cend(); it_gw++) {
-    if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex)) {
+    if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex, dsDataRateIndex)) {
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, true, false);
       m_nrRW1Sent++;
@@ -338,10 +339,11 @@ LoRaWANNetworkServer::RW2TimerExpired (uint32_t deviceAddr)
 
   // Check whether any GW in lastGWs can send a downstream transmission immediately (i.e. right now) in RW2
   // The RW2 LoRa channel is a fixed channel depending on the region, for EU this is the high power 869.525 MHz channel
-  uint8_t dsChannelIndex = LoRaWAN::m_RW2ChannelIndex;
+  const uint8_t dsChannelIndex = LoRaWAN::m_RW2ChannelIndex;
+  const uint8_t dsDataRateIndex = LoRaWAN::m_RW2DataRateIndex;
   bool foundGW = false;
   for (auto it_gw = it_ed->second.m_lastGWs.cbegin(); it_gw != it_ed->second.m_lastGWs.cend(); it_gw++) {
-    if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex)) {
+    if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex, dsDataRateIndex)) {
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, false, true);
       m_nrRW2Sent++;
@@ -381,8 +383,8 @@ LoRaWANNetworkServer::SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayAppli
   if (it->second.m_downstreamQueue.size() > 0) {
     LoRaWANNSDSQueueElement* element = it->second.m_downstreamQueue.front ();
     elementToSend.m_downstreamPacket = element->m_downstreamPacket;
-    elementToSend.m_downstreamMsgType = element->m_downstreamMsgType; // should also set msg type
-    elementToSend.m_downstreamFramePort = element->m_downstreamFramePort; // empty packet, so don't send frame port
+    elementToSend.m_downstreamMsgType = element->m_downstreamMsgType;
+    elementToSend.m_downstreamFramePort = element->m_downstreamFramePort;
 
     // Should we delete pending packet after transmission?
     if (element->m_downstreamMsgType != LORAWAN_CONFIRMED_DATA_DOWN) // delete the queueelement object after the send operation
@@ -651,9 +653,9 @@ LoRaWANGatewayApplication::AssignStreams (int64_t stream)
 }
 
 bool
-LoRaWANGatewayApplication::CanSendImmediatelyOnChannel (uint8_t channelIndex)
+LoRaWANGatewayApplication::CanSendImmediatelyOnChannel (uint8_t channelIndex, uint8_t dataRateIndex)
 {
-  NS_LOG_FUNCTION (this << channelIndex);
+  NS_LOG_FUNCTION (this << (unsigned)channelIndex << (unsigned)dataRateIndex);
 
   Ptr<LoRaWANNetDevice> device = DynamicCast<LoRaWANNetDevice> (GetNode ()->GetDevice (0));
 
@@ -661,7 +663,7 @@ LoRaWANGatewayApplication::CanSendImmediatelyOnChannel (uint8_t channelIndex)
     NS_LOG_ERROR (this << " Cannot get LoRaWANNetDevice pointer belonging to this gateway");
     return false;
   } else {
-    return device->CanSendImmediatelyOnChannel (channelIndex);
+    return device->CanSendImmediatelyOnChannel (channelIndex, dataRateIndex);
   }
 }
 

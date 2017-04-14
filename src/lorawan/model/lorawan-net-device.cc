@@ -605,12 +605,24 @@ LoRaWANNetDevice::MacEndsTx (Ptr<LoRaWANMac> macPtr)
 }
 
 bool
-LoRaWANNetDevice::CanSendImmediatelyOnChannel (uint8_t channelIndex)
+LoRaWANNetDevice::CanSendImmediatelyOnChannel (uint8_t channelIndex, uint8_t dataRateIndex)
 {
   if (this->m_macRDC) {
     int8_t subBandIndex = this->m_macRDC->GetSubBandIndexForChannelIndex (channelIndex);
     NS_ASSERT (subBandIndex >= 0);
-    return this->m_macRDC->IsSubBandAvailable (subBandIndex);
+    // step 1: check RDC restrictions
+    if (this->m_macRDC->IsSubBandAvailable (subBandIndex)) {
+      uint8_t macIndex = 0;
+      if (getMACSIndexForChannelAndDataRate (macIndex, channelIndex, dataRateIndex)) {
+        // step2: check whether MAC object is in Idle state (could be in TX or unavailable)
+        return this->m_macs[macIndex]->GetLoRaWANMacState () == MAC_IDLE;
+      } else {
+        return false;
+      }
+    } else {
+      return false;
+    }
+
   } else {
     NS_LOG_ERROR (this << " m_macRDC is not set");
     return false;

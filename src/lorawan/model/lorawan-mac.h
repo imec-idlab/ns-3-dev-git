@@ -251,6 +251,7 @@ public:
   void SetRDC (Ptr<LoRaWANMacRDC> macRDC);
 
   void SetLoRaWANMacState (LoRaWANMacState macState);
+  LoRaWANMacState GetLoRaWANMacState () const  { return this->m_LoRaWANMacState; }
 
   void ChangeMacState (LoRaWANMacState newState);
 

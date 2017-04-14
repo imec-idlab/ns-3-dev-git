@@ -97,7 +97,7 @@ public:
   void MacBeginsTx (Ptr<LoRaWANMac> macPtr);
   void MacEndsTx (Ptr<LoRaWANMac> macPtr);
 
-  bool CanSendImmediatelyOnChannel (uint8_t channelIndex);
+  bool CanSendImmediatelyOnChannel (uint8_t channelIndex, uint8_t dataRateIndex);
 
   LoRaWANDeviceType GetDeviceType (void) const;
   // void SetDeviceType (LoRaWANDeviceType type);

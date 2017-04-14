@@ -212,7 +212,7 @@ public:
    */
   void HandleRead (Ptr<Socket> socket);
 
-  bool CanSendImmediatelyOnChannel (uint8_t channelIndex);
+  bool CanSendImmediatelyOnChannel (uint8_t channelIndex, uint8_t dataRateIndex);
   void SendDSPacket (Ptr<Packet> p);
 protected:
   virtual void DoInitialize (void);
