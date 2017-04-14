@@ -498,24 +498,50 @@ LoRaWANNetworkServer::DSTimerExpired (uint32_t deviceAddr)
 
   // Generate a Downstream packet
   if (it->second.m_downstreamQueue.size () > 0)
-    NS_LOG_WARN(this << " DS queue for end device " << Ipv4Address(deviceAddr) << " is not empty");
+    NS_LOG_INFO(this << " DS queue for end device " << Ipv4Address(deviceAddr) << " is not empty");
 
-  Ptr<Packet> pkt = Create<Packet> (m_pktSize);
-  LoRaWANNSDSQueueElement* element = new LoRaWANNSDSQueueElement ();
-  element->m_downstreamPacket = pkt;
-  element->m_downstreamFramePort = 1;
-  if (m_confirmedData) {
-    element->m_downstreamMsgType = LORAWAN_CONFIRMED_DATA_DOWN;
-    element->m_downstreamTransmissionsRemaining = DEFAULT_NUMBER_DS_TRANSMISSIONS;
-  } else {
-    element->m_downstreamMsgType = LORAWAN_UNCONFIRMED_DATA_DOWN;
-    element->m_downstreamTransmissionsRemaining = 1;
+  NS_ASSERT (m_pktSize >= 8 + 1 + 4); // should be able to send at least frame header, MAC header and MAC MIC
+  bool generatePacket = true;
+  if (m_pktSize < 8 + 1 + 4) {
+    NS_LOG_ERROR (this << " m_pktSize = " << m_pktSize << " is too small, not generating DS packets");
+    generatePacket = false;
   }
-  element->m_isRetransmission = false;
-  it->second.m_downstreamQueue.push_back (element);
-  it->second.m_nDSPacketsGenerated += 1;
 
-  NS_LOG_DEBUG (this << " Added downstream packet with size " << m_pktSize  << " to DS queue for end device " << Ipv4Address(deviceAddr) << ". queue size = " << it->second.m_downstreamQueue.size());
+  if (generatePacket) {
+    uint8_t frmPayloadSize = m_pktSize - (8 + 1 + 4);
+
+    Ptr<Packet> packet;
+    if (frmPayloadSize >= sizeof(uint64_t)) { // check whether payload size is large enough to hold 64 bit integer
+      // send decrementing counter as payload (note: globally shared counter)
+      uint8_t* payload = new uint8_t[frmPayloadSize](); // the parenthesis initialize the allocated memory to zero
+      if (payload) {
+        const uint64_t counter = LoRaWANCounterSingleton::GetCounter ();
+        ((uint64_t*)payload)[0] = counter; // copy counter to beginning of payload
+        packet = Create<Packet> (payload, frmPayloadSize);
+        delete[] payload;
+      } else {
+        packet = Create<Packet> (frmPayloadSize);
+      }
+    } else {
+      packet = Create<Packet> (frmPayloadSize);
+    }
+
+    LoRaWANNSDSQueueElement* element = new LoRaWANNSDSQueueElement ();
+    element->m_downstreamPacket = packet;
+    element->m_downstreamFramePort = 1;
+    if (m_confirmedData) {
+      element->m_downstreamMsgType = LORAWAN_CONFIRMED_DATA_DOWN;
+      element->m_downstreamTransmissionsRemaining = DEFAULT_NUMBER_DS_TRANSMISSIONS;
+    } else {
+      element->m_downstreamMsgType = LORAWAN_UNCONFIRMED_DATA_DOWN;
+      element->m_downstreamTransmissionsRemaining = 1;
+    }
+    element->m_isRetransmission = false;
+    it->second.m_downstreamQueue.push_back (element);
+    it->second.m_nDSPacketsGenerated += 1;
+
+    NS_LOG_DEBUG (this << " Added downstream packet with size " << m_pktSize  << " to DS queue for end device " << Ipv4Address(deviceAddr) << ". queue size = " << it->second.m_downstreamQueue.size());
+  }
 
   // Reschedule timer:
   Time t = Seconds (this->m_downstreamIATRandomVariable->GetValue ());
