@@ -117,6 +117,8 @@ private:
   bool m_generateDataDown;
   bool m_confirmedData;
   Ptr<RandomVariableStream> m_downstreamIATRandomVariable;
+  TracedValue<uint32_t> m_nrRW1Sent; // number of times that a DS packet was sent in RW1 by this NS
+  TracedValue<uint32_t> m_nrRW2Sent; // number of times that a DS packet was sent in RW2 by this NS
   TracedValue<uint32_t> m_nrRW1Missed; // number of times that RW1 was missed for all end devices served by this NS
   TracedValue<uint32_t> m_nrRW2Missed; // number of times that RW2 was missed for all end devices served by this NS
 };

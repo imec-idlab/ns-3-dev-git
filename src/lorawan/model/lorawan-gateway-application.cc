@@ -49,7 +49,7 @@ NS_OBJECT_ENSURE_REGISTERED (LoRaWANGatewayApplication);
 
 Ptr<LoRaWANNetworkServer> LoRaWANNetworkServer::m_ptr = NULL;
 
-LoRaWANNetworkServer::LoRaWANNetworkServer () : m_nrRW1Missed(0), m_nrRW2Missed(0) {}
+LoRaWANNetworkServer::LoRaWANNetworkServer () : m_nrRW1Sent(0), m_nrRW2Sent(0), m_nrRW1Missed(0), m_nrRW2Missed(0) {}
 
 TypeId
 LoRaWANNetworkServer::GetTypeId (void)
@@ -81,6 +81,14 @@ LoRaWANNetworkServer::GetTypeId (void)
 //    .AddTraceSource ("Tx", "A new packet is created and is sent",
 //                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_txTrace),
 //                     "ns3::Packet::TracedCallback")
+    .AddTraceSource ("nrRW1Sent",
+                     "The number of times that a DS packet was sent in RW1 by this network server",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_nrRW1Sent),
+                     "ns3::TracedValueCallback::Uint32")
+    .AddTraceSource ("nrRW2Sent",
+                     "The number of times that a DS packet was sent in RW2 by this network server",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_nrRW2Sent),
+                     "ns3::TracedValueCallback::Uint32")
     .AddTraceSource ("nrRW1Missed",
                      "The number of times RW1 was missed for all end devics served by this network server",
                      MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_nrRW1Missed),
@@ -297,6 +305,7 @@ LoRaWANNetworkServer::RW1TimerExpired (uint32_t deviceAddr)
     if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex)) {
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, true, false);
+      m_nrRW1Sent++;
     }
   }
 
@@ -335,6 +344,7 @@ LoRaWANNetworkServer::RW2TimerExpired (uint32_t deviceAddr)
     if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex)) {
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, false, true);
+      m_nrRW2Sent++;
     }
   }
 

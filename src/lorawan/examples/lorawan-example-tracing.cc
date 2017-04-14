@@ -108,6 +108,8 @@ public:
   static void PhyStateChangeNotification (LoRaWANExampleTracing* example, Ptr<LoRaWANNetDevice> device, Ptr<LoRaWANPhy> phy, LoRaWANPhyEnumeration oldState, LoRaWANPhyEnumeration newState);
   static void MacStateChangeNotification (LoRaWANExampleTracing* example, Ptr<LoRaWANNetDevice> device, Ptr<LoRaWANMac> mac, LoRaWANMacState oldState, LoRaWANMacState newState);
 
+  static void nrRW1SentTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue);
+  static void nrRW2SentTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue);
   static void nrRW1MissedTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue);
   static void nrRW2MissedTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue);
 
@@ -151,6 +153,8 @@ private:
 
   std::string m_nodesCSVFileName;
 
+  uint32_t m_nrRW1Sent;
+  uint32_t m_nrRW2Sent;
   uint32_t m_nrRW1Missed;
   uint32_t m_nrRW2Missed;
 
@@ -337,7 +341,9 @@ int main (int argc, char *argv[])
     miscTraceCSVFileName << simRunFilesPrefix.str() << "-trace-misc.csv";
     if (traceMisc) {
       std::ofstream out4 (miscTraceCSVFileName.str ().c_str ());
-      out4 << "nrRW1Missed," <<
+      out4 << "nrRW1Sent," <<
+        "nrRW2Sent," <<
+        "nrRW1Missed," <<
         "nrRW2Missed" <<
         std::endl;
       out4.close ();
@@ -416,7 +422,7 @@ int main (int argc, char *argv[])
   return 0;
 }
 
-LoRaWANExampleTracing::LoRaWANExampleTracing () : m_nrRW1Missed(0), m_nrRW2Missed(0) {}
+LoRaWANExampleTracing::LoRaWANExampleTracing () : m_nrRW1Sent(0), m_nrRW2Sent(0), m_nrRW1Missed(0), m_nrRW2Missed(0) {}
 
 void
 LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double discRadius, double totalTime,
@@ -960,6 +966,8 @@ LoRaWANExampleTracing::SetupTracing (bool tracePhyTransmissions, bool tracePhySt
     Ptr<LoRaWANNetworkServer> lorawanNSPtr = LoRaWANNetworkServer::getLoRaWANNetworkServerPointer ();
     NS_ASSERT (lorawanNSPtr);
     if (lorawanNSPtr) {
+      lorawanNSPtr->TraceConnectWithoutContext ("nrRW1Sent", MakeBoundCallback (&LoRaWANExampleTracing::nrRW1SentTrace, this));
+      lorawanNSPtr->TraceConnectWithoutContext ("nrRW2Sent", MakeBoundCallback (&LoRaWANExampleTracing::nrRW2SentTrace, this));
       lorawanNSPtr->TraceConnectWithoutContext ("nrRW1Missed", MakeBoundCallback (&LoRaWANExampleTracing::nrRW1MissedTrace, this));
       lorawanNSPtr->TraceConnectWithoutContext ("nrRW2Missed", MakeBoundCallback (&LoRaWANExampleTracing::nrRW2MissedTrace, this));
     }
@@ -1181,6 +1189,17 @@ LoRaWANExampleTracing::MacStateChangeNotification (LoRaWANExampleTracing* exampl
 }
 
 void
+LoRaWANExampleTracing::nrRW1SentTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue)
+{
+  example->m_nrRW1Sent = newValue;
+}
+
+void
+LoRaWANExampleTracing::nrRW2SentTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue)
+{
+  example->m_nrRW2Sent = newValue;
+}
+void
 LoRaWANExampleTracing::nrRW1MissedTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue)
 {
   example->m_nrRW1Missed = newValue;
@@ -1196,7 +1215,9 @@ void
 LoRaWANExampleTracing::WriteMiscStatsToFile ()
 {
   std::ofstream out (m_miscTraceCSVFileName.c_str (), std::ios::app);
-  out << m_nrRW1Missed << ","
+  out << m_nrRW1Sent << ","
+    << m_nrRW2Sent << ","
+    << m_nrRW1Missed << ","
     << m_nrRW2Missed
     << std::endl;
   out.close ();
