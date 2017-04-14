@@ -272,9 +272,10 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
         NS_LOG_ERROR (this << " Upstream frame has Ack bit set, but downstream frame msg type is not Confirmed (msgType = " << it->second.m_downstreamQueue.front()->m_downstreamMsgType << ")");
       }
     } else {
-      // One occurence of this condition is when the NS receives a retransmission that re-acknowledges a previously send DS confirmed packet,
-      // This condition is fulfilled the DS Ack for the previously transmitted US frame was sent by the NS but not received by the end device
-      NS_LOG_ERROR (this << " Upstream frame has Ack bit set, but there is no downstream frame queued.");
+      // One occurence of this condition is when the NS receives a retransmission that re-acknowledges a previously send DS confirmed packet
+      // This condition is fulfilled when the DS Ack for the previously transmitted US frame was sent by the NS but not received by the end device
+      // Note that an end device retransmitting a frame will not change the Ack bit between retransmissions (ns-3 implementation limitation, to be fixed)
+      NS_LOG_WARN (this << " Upstream frame has Ack bit set, but there is no downstream frame queued.");
     }
   }
 
@@ -496,6 +497,8 @@ LoRaWANNetworkServer::SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayAppli
 void
 LoRaWANNetworkServer::DSTimerExpired (uint32_t deviceAddr)
 {
+  NS_LOG_FUNCTION (this << deviceAddr);
+
   auto it = m_endDevices.find (deviceAddr);
   if (it == m_endDevices.end ()) { // end device not found
     NS_LOG_ERROR (this << " Could not find device info struct in m_endDevices for dev addr " << deviceAddr);
