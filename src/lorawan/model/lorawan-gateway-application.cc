@@ -264,8 +264,8 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
     if (!it->second.m_downstreamQueue.empty ()) { // there is a DS message in the queue
       if (it->second.m_downstreamQueue.front()->m_downstreamMsgType == LORAWAN_CONFIRMED_DATA_DOWN) { // End device confirmed reception of DS packet, so we can remove it:
         LoRaWANNSDSQueueElement* ptr = it->second.m_downstreamQueue.front();
-        delete ptr;
-        it->second.m_downstreamQueue.pop_front();
+
+        this->DeleteFirstDSQueueElement (key);
 
         NS_LOG_DEBUG (this << " Received Ack for Confirmed DS packet, removing packet from DS queue for end device " << deviceAddr);
       } else {
@@ -488,9 +488,7 @@ LoRaWANNetworkServer::SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayAppli
 
   // For some cases (see deleteQueueElement bool), remove the pending DS packet here
   if (deleteQueueElement) {
-    LoRaWANNSDSQueueElement* ptr = it->second.m_downstreamQueue.front ();
-    delete ptr;
-    it->second.m_downstreamQueue.pop_front ();
+    this->DeleteFirstDSQueueElement (deviceAddr);
   }
 }
 
@@ -556,6 +554,20 @@ LoRaWANNetworkServer::DSTimerExpired (uint32_t deviceAddr)
   Time t = Seconds (this->m_downstreamIATRandomVariable->GetValue ());
   it->second.m_downstreamTimer = Simulator::Schedule (t, &LoRaWANNetworkServer::DSTimerExpired, this, deviceAddr);
   NS_LOG_DEBUG (this << " DS Traffic Timer for end device " << it->second.m_deviceAddress << " scheduled at " << t);
+}
+
+void
+LoRaWANNetworkServer::DeleteFirstDSQueueElement (uint32_t deviceAddr)
+{
+  auto it = m_endDevices.find (deviceAddr);
+  if (it == m_endDevices.end ()) { // end device not found
+    NS_LOG_ERROR (this << " Could not find device info struct in m_endDevices for dev addr " << deviceAddr << ". Unable to delete DS queue element.");
+    return;
+  }
+
+  LoRaWANNSDSQueueElement* ptr = it->second.m_downstreamQueue.front ();
+  delete ptr;
+  it->second.m_downstreamQueue.pop_front ();
 }
 
 int64_t

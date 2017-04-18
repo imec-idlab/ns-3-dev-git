@@ -109,6 +109,7 @@ public:
   void SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayApplication> gatewayPtr, bool RW1, bool RW2);
   bool HaveSomethingToSendToEndDevice (uint32_t deviceAddr);
   void DSTimerExpired (uint32_t deviceAddr);
+  void DeleteFirstDSQueueElement (uint32_t deviceAddr);
 
   int64_t AssignStreams (int64_t stream);
 private:
