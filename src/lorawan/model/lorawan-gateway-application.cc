@@ -97,6 +97,18 @@ LoRaWANNetworkServer::GetTypeId (void)
                      "The number of times RW2 was missed for all end devics served by this network server",
                      MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_nrRW2Missed),
                      "ns3::TracedValueCallback::Uint32")
+    .AddTraceSource ("DSMsgTransmitted",
+                     "A DS msg has been transmitted by this network server",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_dsMsgTransmittedTrace),
+                     "ns3::TracedValueCallback::LoRaWANDSMessageTransmittedTracedCallback")
+    .AddTraceSource ("DSMsgAckd",
+                     "DS msg has been acknowledged by end device.",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_dsMsgAckdTrace),
+                     "ns3::TracedValueCallback::LoRaWANDSMessageTracedCallback")
+    .AddTraceSource ("DSMsgDropped",
+                     "DS msg has been dropped by this network server",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_dsMsgDroppedTrace),
+                     "ns3::TracedValueCallback::LoRaWANDSMessageTracedCallback")
   ;
   return tid;
 }
@@ -265,6 +277,9 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
       if (it->second.m_downstreamQueue.front()->m_downstreamMsgType == LORAWAN_CONFIRMED_DATA_DOWN) { // End device confirmed reception of DS packet, so we can remove it:
         LoRaWANNSDSQueueElement* ptr = it->second.m_downstreamQueue.front();
 
+        // LOG that network server received an Acknowledgment for a DS packet
+        m_dsMsgAckdTrace (key, ptr->m_downstreamTransmissionsRemaining, ptr->m_downstreamMsgType, ptr->m_downstreamPacket);
+
         this->DeleteFirstDSQueueElement (key);
 
         NS_LOG_DEBUG (this << " Received Ack for Confirmed DS packet, removing packet from DS queue for end device " << deviceAddr);
@@ -389,16 +404,6 @@ LoRaWANNetworkServer::SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayAppli
   bool deleteQueueElement = false;
   if (it->second.m_downstreamQueue.size() > 0) {
     LoRaWANNSDSQueueElement* element = it->second.m_downstreamQueue.front ();
-    elementToSend.m_downstreamPacket = element->m_downstreamPacket;
-    elementToSend.m_downstreamMsgType = element->m_downstreamMsgType;
-    elementToSend.m_downstreamFramePort = element->m_downstreamFramePort;
-
-    // Should we delete pending packet after transmission?
-    if (element->m_downstreamMsgType != LORAWAN_CONFIRMED_DATA_DOWN) // delete the queueelement object after the send operation
-      deleteQueueElement = true;
-    else
-      if (element->m_downstreamTransmissionsRemaining == 1) // in case of CONFIRMED_DATA_DOWN, delete the pending transmission when the number of remaining transmissions has reached 1
-        deleteQueueElement = true;
 
     // Bookkeeping for Confirmed packets:
     if (element->m_downstreamMsgType == LORAWAN_CONFIRMED_DATA_DOWN) {
@@ -411,6 +416,23 @@ LoRaWANNetworkServer::SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayAppli
       element->m_downstreamTransmissionsRemaining--; // decrement
       element->m_isRetransmission = true;
     }
+
+    // Should we delete pending packet after transmission?
+    if (element->m_downstreamMsgType != LORAWAN_CONFIRMED_DATA_DOWN) { // delete the queueelement object after the send operation
+      deleteQueueElement = true;
+    } else {
+      if (element->m_downstreamTransmissionsRemaining == 0) {// in case of CONFIRMED_DATA_DOWN, delete the pending transmission when the number of remaining transmissions has reached 1
+        deleteQueueElement = true;
+
+        // LOG that network server will delete DS packet from queue
+        m_dsMsgDroppedTrace (deviceAddr, 0, element->m_downstreamMsgType, element->m_downstreamPacket);
+      }
+    }
+
+    elementToSend.m_downstreamPacket = element->m_downstreamPacket;
+    elementToSend.m_downstreamMsgType = element->m_downstreamMsgType;
+    elementToSend.m_downstreamFramePort = element->m_downstreamFramePort;
+    elementToSend.m_downstreamTransmissionsRemaining = element->m_downstreamTransmissionsRemaining;
   } else {
     if (!it->second.m_setAck) {
       // Not really a warning as there is just no need to send a DS packet (i.e. no data and no Ack)
@@ -421,8 +443,13 @@ LoRaWANNetworkServer::SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayAppli
       elementToSend.m_downstreamPacket = Create<Packet> (0); // create empty packet so that we can send the Ack
       elementToSend.m_downstreamMsgType = LORAWAN_UNCONFIRMED_DATA_DOWN; // should also set msg type
       elementToSend.m_downstreamFramePort = 0; // empty packet, so don't send frame port
+      elementToSend.m_downstreamTransmissionsRemaining = 0;
     }
   }
+
+  // LOG DS msg transmission
+  uint8_t rwNumber = RW1 ? 1 : 2;
+  m_dsMsgTransmittedTrace (deviceAddr, elementToSend.m_downstreamTransmissionsRemaining, elementToSend.m_downstreamMsgType, elementToSend.m_downstreamPacket, rwNumber);
 
   // Make a copy here, this is u
   Ptr<Packet> p;

@@ -34,6 +34,32 @@
 
 namespace ns3 {
 
+namespace TracedValueCallback {
+/**
+ * \ingroup lorawan
+ * TracedCallback signature for tracing NS message events: DS msg transmitted, DS msg ackd and DS msg Dropped
+ *
+ * \param [in] deviceAddr The device address to whom the DS msg is addressed.
+ * \param [in] txRemaining Number of remaining transmissions for message.
+ * \param [in] msgType MAC message type of message.
+ * \param [in] packet The DS message.
+ */
+
+  typedef void (* LoRaWANDSMessageTransmittedTracedCallback) (uint32_t deviceAddr, uint8_t txRemaining, uint8_t msgType, Ptr<const Packet> packet);
+
+/**
+ * \ingroup lorawan
+ * TracedCallback signature for tracing NS message events: DS msg transmitted, DS msg ackd and DS msg Dropped
+ *
+ * \param [in] deviceAddr The device address to whom the DS msg is addressed.
+ * \param [in] txRemaining Number of remaining transmissions for message.
+ * \param [in] msgType MAC message type of message.
+ * \param [in] packet The DS message.
+ */
+
+  typedef void (* LoRaWANDSMessageTracedCallback) (uint32_t deviceAddr, uint8_t txRemaining, uint8_t msgType, Ptr<const Packet> packet);
+}  // namespace TracedValueCallback
+
 class Address;
 class RandomVariableStream;
 class Socket;
@@ -123,6 +149,10 @@ private:
   TracedValue<uint32_t> m_nrRW2Sent; // number of times that a DS packet was sent in RW2 by this NS
   TracedValue<uint32_t> m_nrRW1Missed; // number of times that RW1 was missed for all end devices served by this NS
   TracedValue<uint32_t> m_nrRW2Missed; // number of times that RW2 was missed for all end devices served by this NS
+
+  TracedCallback<uint32_t, uint8_t, uint8_t, Ptr<const Packet>, uint8_t > m_dsMsgTransmittedTrace;
+  TracedCallback<uint32_t, uint8_t, uint8_t, Ptr<const Packet> > m_dsMsgAckdTrace;
+  TracedCallback<uint32_t, uint8_t, uint8_t, Ptr<const Packet> > m_dsMsgDroppedTrace;
 };
 
 /**
