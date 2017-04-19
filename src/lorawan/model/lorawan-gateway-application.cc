@@ -226,6 +226,7 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
   // ii) Retransmission of a previously transmitted US Packet (then the NS has to reply with an Ack): i.e. frame counter up already seen, seen longer than 1 second ago
   // iii) The same transmission received by a second Gateway (in this case we can drop the packet): i.e. frame counter up already seen, seen shorter than 1 second ago
   bool firstRX = frmHdr.getFrameCounter () == 0;
+  bool processMACAck = true;
   if (frmHdr.getFrameCounter () <= it->second.m_fCntUp && !firstRX) {
     Time t = Simulator::Now () - it->second.m_lastSeen;
     if (t <= Seconds (1.0)) { // assume US packet is really a duplicate received by a second gateway
@@ -237,6 +238,7 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
       return;
     } else { // assume US packet is a retransmission
       it->second.m_nUSRetransmission += 1;
+      processMACAck = false; // as we have already receive this US packet is a retransmission, we should not process the Ack flag set in the MAC header (but we should still open a RW or reply with an Ack if necessary)
     }
   } else { // new US frame counter value -> update number of unique packets received and US frame counter
     it->second.m_nUniqueUSPackets += 1;
@@ -270,7 +272,7 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
   }
 
   // Parse Ack flag:
-  if (frmHdr.getAck ()) {
+  if (processMACAck && frmHdr.getAck ()) {
     it->second.m_nUSAcks += 1;
 
     if (!it->second.m_downstreamQueue.empty ()) { // there is a DS message in the queue
