@@ -407,6 +407,10 @@ int main (int argc, char *argv[])
     simSettings << "\tstdcout = " << stdcout << std::endl;
     simSettings << "\ttracePhyTransmissions = " << tracePhyTransmissions << std::endl;
     simSettings << "\ttracePhyStates = " << tracePhyStates << std::endl;
+    simSettings << "\ttraceMacPackets = " << traceMacPackets << std::endl;
+    simSettings << "\ttraceMacStates = " << traceMacStates << std::endl;
+    simSettings << "\ttraceNsDsMsgs = " << traceNsDsMsgs << std::endl;
+    simSettings << "\ttraceMisc = " << traceMisc << std::endl;
     simSettings << "\toutputFileNamePrefix = " << outputFileNamePrefix << std::endl;
     simSettings << "\trun = " << i << std::endl;
     simSettings << "\tseed = " << seed << std::endl;
@@ -414,6 +418,7 @@ int main (int argc, char *argv[])
     simSettings << "\tphyStateTraceCSVFileName = " << phyStateTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacPacketTraceCSVFileName = " << macPacketTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacStateTraceCSVFileName = " << macStateTraceCSVFileName.str() << std::endl;
+    simSettings << "\tnsDSMsgTraceCSVFileName = " << nsDSMsgTraceCSVFileName.str() << std::endl;
     simSettings << "\tmiscTraceCSVFileName = " << miscTraceCSVFileName.str() << std::endl;
     simSettings << "\tnodesCSVFileName = " << nodesCSVFileName.str() << std::endl;
     simSettings << "\tData rate assignment method index: " << loRaWANDataRateCalcMethodIndex;
