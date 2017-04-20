@@ -331,6 +331,7 @@ LoRaWANNetworkServer::RW1TimerExpired (uint32_t deviceAddr)
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, true, false);
       m_nrRW1Sent++;
+      break;
     }
   }
 
@@ -371,6 +372,7 @@ LoRaWANNetworkServer::RW2TimerExpired (uint32_t deviceAddr)
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, false, true);
       m_nrRW2Sent++;
+      break;
     }
   }
 
