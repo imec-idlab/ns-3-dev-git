@@ -252,6 +252,7 @@ public:
 
   void SetLoRaWANMacState (LoRaWANMacState macState);
   LoRaWANMacState GetLoRaWANMacState () const  { return this->m_LoRaWANMacState; }
+  bool IsLoRaWANMacStateRunning () const { return this->m_setMacState.IsRunning (); }
 
   void ChangeMacState (LoRaWANMacState newState);
 

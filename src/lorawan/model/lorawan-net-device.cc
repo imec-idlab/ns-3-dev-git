@@ -615,18 +615,20 @@ LoRaWANNetDevice::CanSendImmediatelyOnChannel (uint8_t channelIndex, uint8_t dat
       uint8_t macIndex = 0;
       if (getMACSIndexForChannelAndDataRate (macIndex, channelIndex, dataRateIndex)) {
         // step2: check whether MAC object is in Idle state (could be in TX or unavailable)
-        return this->m_macs[macIndex]->GetLoRaWANMacState () == MAC_IDLE;
-      } else {
-        return false;
+        if (this->m_macs[macIndex]->GetLoRaWANMacState () == MAC_IDLE) {
+          // step3: check whether a MAC event is scheduled (MAC state could be scheduled to go to TX state)
+          if (!this->m_macs[macIndex]->IsLoRaWANMacStateRunning ()) {
+            return true;
+          }
+        }
       }
-    } else {
-      return false;
     }
-
   } else {
     NS_LOG_ERROR (this << " m_macRDC is not set");
     return false;
   }
+
+  return false;
 }
 
 bool
