@@ -225,7 +225,7 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
   // i) The first time the NS sees the US Packet: i.e. new frame counter up value
   // ii) Retransmission of a previously transmitted US Packet (then the NS has to reply with an Ack): i.e. frame counter up already seen, seen longer than 1 second ago
   // iii) The same transmission received by a second Gateway (in this case we can drop the packet): i.e. frame counter up already seen, seen shorter than 1 second ago
-  bool firstRX = frmHdr.getFrameCounter () == 0;
+  bool firstRX = it->second.m_nUSPackets == 0;
   bool processMACAck = true;
   if (frmHdr.getFrameCounter () <= it->second.m_fCntUp && !firstRX) {
     Time t = Simulator::Now () - it->second.m_lastSeen;
