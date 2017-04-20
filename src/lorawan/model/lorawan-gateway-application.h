@@ -74,6 +74,13 @@ typedef struct LoRaWANNSDSQueueElement {
 } LoRaWANNSDSQueueElement;
 
 typedef struct LoRaWANEndDeviceInfoNS {
+  LoRaWANEndDeviceInfoNS () : m_deviceAddress(), m_rx1DROffset(0), m_lastDSGW(nullptr), m_lastGWs(),
+	m_lastDataRateIndex(0), m_lastChannelIndex(0), m_lastCodeRate(0), m_lastSeen(0),
+	m_framePending(false),m_setAck(false), m_fCntUp(0), m_fCntDown(0),
+	m_nUSPackets(0), m_nUniqueUSPackets(0), m_nUSRetransmission(0), m_nUSDuplicates(0), m_nUSAcks(0),
+	m_nDSPacketsGenerated(0), m_nDSPacketsSent(0), m_nDSPacketsSentRW1(0), m_nDSPacketsSentRW2(0), m_nDSRetransmission(0), m_nDSAcks(0),
+	m_rw1Timer(), m_rw2Timer(), m_downstreamQueue(),m_downstreamTimer() {}
+
   Ipv4Address     m_deviceAddress;
   uint8_t 	  m_rx1DROffset;
   Ptr<LoRaWANGatewayApplication> m_lastDSGW;
