@@ -49,7 +49,7 @@ NS_OBJECT_ENSURE_REGISTERED (LoRaWANGatewayApplication);
 
 Ptr<LoRaWANNetworkServer> LoRaWANNetworkServer::m_ptr = NULL;
 
-LoRaWANNetworkServer::LoRaWANNetworkServer () : m_nrRW1Sent(0), m_nrRW2Sent(0), m_nrRW1Missed(0), m_nrRW2Missed(0) {}
+LoRaWANNetworkServer::LoRaWANNetworkServer () : m_endDevices(), m_pktSize(0), m_generateDataDown(false), m_confirmedData(false), m_endDevicesPopulated(false), m_downstreamIATRandomVariable(nullptr), m_nrRW1Sent(0), m_nrRW2Sent(0), m_nrRW1Missed(0), m_nrRW2Missed(0) {}
 
 TypeId
 LoRaWANNetworkServer::GetTypeId (void)
@@ -124,9 +124,11 @@ LoRaWANNetworkServer::DoInitialize (void)
 void
 LoRaWANNetworkServer::PopulateEndDevices (void)
 {
-  // Populate m_endDevices based on ns3::NodeList
-  m_endDevices.clear ();
+  // only populate end devices once:
+  if (m_endDevicesPopulated)
+    return;
 
+  // Populate m_endDevices based on ns3::NodeList
   for (NodeList::Iterator it = NodeList::Begin (); it != NodeList::End (); ++it)
   {
     Ptr<Node> nodePtr(*it);
@@ -142,9 +144,11 @@ LoRaWANNetworkServer::PopulateEndDevices (void)
       uint32_t key = ipv4DevAddr.Get ();
       m_endDevices[key] = info; // store object
     } else {
+      NS_LOG_ERROR (this << " Unable to allocate device address");
       continue;
     }
   }
+  m_endDevicesPopulated = true;
 }
 
 void

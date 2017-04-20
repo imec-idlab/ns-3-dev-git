@@ -151,6 +151,7 @@ private:
   uint16_t m_pktSize;
   bool m_generateDataDown;
   bool m_confirmedData;
+  bool m_endDevicesPopulated;
   Ptr<RandomVariableStream> m_downstreamIATRandomVariable;
   TracedValue<uint32_t> m_nrRW1Sent; // number of times that a DS packet was sent in RW1 by this NS
   TracedValue<uint32_t> m_nrRW2Sent; // number of times that a DS packet was sent in RW2 by this NS
