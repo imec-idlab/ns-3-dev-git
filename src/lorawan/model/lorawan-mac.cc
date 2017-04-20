@@ -806,8 +806,9 @@ LoRaWANMac::CheckQueue ()
   // If a gateway can not send a packet immediately, then there is no use in trying to send it later as the RW of the end device will not be open later
   if (m_deviceType == LORAWAN_DT_GATEWAY) {
     if (!m_txQueue.empty ()) {
-      NS_LOG_WARN (this << " Gateway is unable to send packet immediately, aborting packet transmission.");
+      // this is a dangereous state to be in, experience has shown that the gateway MACs gets stuck at this point
       this->RemoveFirstTxQElement (false);
+      NS_FATAL_ERROR (this << " Gateway is unable to send packet immediately, aborting packet transmission.");
     }
   }
 }
