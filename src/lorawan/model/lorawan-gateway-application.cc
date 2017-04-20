@@ -237,7 +237,6 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
       // Duplicate, drop packet
       it->second.m_nUSDuplicates += 1;
       NS_LOG_INFO (this << " Duplicate detected: " << frmHdr.getFrameCounter () << " <= " << it->second.m_fCntUp << " &&  t = " << t << " < 1 second => dropping packet");
-      NS_LOG_INFO (this << "Simulator::Now() = " << Simulator::Now() << " lastSeen = " << it->second.m_lastSeen);
       // TODO: add trace for dropping duplicate packets?
       return;
     } else { // assume US packet is a retransmission
