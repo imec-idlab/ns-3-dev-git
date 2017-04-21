@@ -333,7 +333,6 @@ LoRaWANNetworkServer::RW1TimerExpired (uint32_t deviceAddr)
     if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex, dsDataRateIndex)) {
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, true, false);
-      m_nrRW1Sent++;
       break;
     }
   }
@@ -374,7 +373,6 @@ LoRaWANNetworkServer::RW2TimerExpired (uint32_t deviceAddr)
     if ((*it_gw)->CanSendImmediatelyOnChannel (dsChannelIndex, dsDataRateIndex)) {
       foundGW = true;
       this->SendDSPacket (deviceAddr, *it_gw, false, true);
-      m_nrRW2Sent++;
       break;
     }
   }
@@ -503,10 +501,13 @@ LoRaWANNetworkServer::SendDSPacket (uint32_t deviceAddr, Ptr<LoRaWANGatewayAppli
 
   // Update DS Packet counters:
   it->second.m_nDSPacketsSent += 1;
-  if (RW1)
+  if (RW1) {
+    m_nrRW1Sent++;
     it->second.m_nDSPacketsSentRW1 += 1;
-  else if (RW2)
+  } else if (RW2) {
     it->second.m_nDSPacketsSentRW2 += 1;
+    m_nrRW2Sent++;
+  }
   if (it->second.m_setAck)
     it->second.m_nDSAcks += 1;
 
