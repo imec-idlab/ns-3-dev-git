@@ -116,6 +116,7 @@ public:
   static void nrRW2MissedTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue);
 
   std::ostringstream GenerateNSDSMsgTraceOutputLine (std::string traceSource, uint32_t deviceAddress, uint8_t transmissionsRemaning, uint8_t msgType, Ptr<const Packet> packet, bool insertNewLine = true);
+  static void DSMsgGeneratedTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>);
   static void DSMsgTransmittedTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>, uint8_t rw);
   static void DSMsgAckdTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>);
   static void DSMsgDroppedTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>);
@@ -997,6 +998,7 @@ LoRaWANExampleTracing::SetupTracing (bool tracePhyTransmissions, bool tracePhySt
     Ptr<LoRaWANNetworkServer> lorawanNSPtr = LoRaWANNetworkServer::getLoRaWANNetworkServerPointer ();
     NS_ASSERT (lorawanNSPtr);
     if (lorawanNSPtr) {
+      lorawanNSPtr->TraceConnectWithoutContext ("DSMsgGenerated", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgGeneratedTrace, this));
       lorawanNSPtr->TraceConnectWithoutContext ("DSMsgTransmitted", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgTransmittedTrace, this));
       lorawanNSPtr->TraceConnectWithoutContext ("DSMsgAckd", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgAckdTrace, this));
       lorawanNSPtr->TraceConnectWithoutContext ("DSMsgDropped", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgDroppedTrace, this));
@@ -1288,6 +1290,13 @@ LoRaWANExampleTracing::DSMsgTransmittedTrace (LoRaWANExampleTracing* example, ui
   std::ostringstream output = example->GenerateNSDSMsgTraceOutputLine ("DSMsgTx", deviceAddress, transmissionsRemaning, msgType, packet, false);
   // add receive window to output
   output << "," << (unsigned)rw << std::endl;
+  example->LogOutputLine (output.str (), example->m_nsDSMsgTraceCSVFileName);
+}
+
+void
+LoRaWANExampleTracing::DSMsgGeneratedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t transmissionsRemaning, uint8_t msgType, Ptr<const Packet> packet)
+{
+  std::ostringstream output = example->GenerateNSDSMsgTraceOutputLine ("DSMsgGenerated", deviceAddress, transmissionsRemaning, msgType, packet);
   example->LogOutputLine (output.str (), example->m_nsDSMsgTraceCSVFileName);
 }
 

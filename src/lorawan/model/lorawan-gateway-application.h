@@ -158,6 +158,7 @@ private:
   TracedValue<uint32_t> m_nrRW1Missed; // number of times that RW1 was missed for all end devices served by this NS
   TracedValue<uint32_t> m_nrRW2Missed; // number of times that RW2 was missed for all end devices served by this NS
 
+  TracedCallback<uint32_t, uint8_t, uint8_t, Ptr<const Packet> > m_dsMsgGeneratedTrace;
   TracedCallback<uint32_t, uint8_t, uint8_t, Ptr<const Packet>, uint8_t > m_dsMsgTransmittedTrace;
   TracedCallback<uint32_t, uint8_t, uint8_t, Ptr<const Packet> > m_dsMsgAckdTrace;
   TracedCallback<uint32_t, uint8_t, uint8_t, Ptr<const Packet> > m_dsMsgDroppedTrace;
