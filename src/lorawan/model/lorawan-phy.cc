@@ -786,6 +786,10 @@ LoRaWANPhy::PdDataRequest (const uint32_t phyPayloadLength, Ptr<Packet> p)
       LoRaWANLqiTag lqiTag;
       p->RemovePacketTag (lqiTag);
 
+      m_phyTxBeginTrace (p);
+      m_currentTxPacket.first = p;
+      m_currentTxPacket.second = false;
+
       Ptr<LoRaWANSpectrumSignalParameters> txParams = Create<LoRaWANSpectrumSignalParameters> ();
       txParams->duration = CalculateTxTime (p->GetSize());
       txParams->txPhy = GetObject<SpectrumPhy> ();
@@ -799,9 +803,6 @@ LoRaWANPhy::PdDataRequest (const uint32_t phyPayloadLength, Ptr<Packet> p)
       m_channel->StartTx (txParams);
       m_pdDataRequest = Simulator::Schedule (txParams->duration, &LoRaWANPhy::EndTx, this);
       ChangeTrxState (LORAWAN_PHY_BUSY_TX);
-      m_phyTxBeginTrace (p);
-      m_currentTxPacket.first = p;
-      m_currentTxPacket.second = false;
       return;
     }
   else if ((m_trxState == LORAWAN_PHY_RX_ON)

@@ -46,6 +46,8 @@
 #include <ns3/spectrum-value.h>
 #include <ns3/spectrum-model.h>
 
+#include <ns3/netanim-module.h>
+
 #include <iostream>
 #include <iomanip>
 
@@ -498,10 +500,21 @@ LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double
   std::cout << "Starting simulation for " << m_totalTime << " s ...\n";
 
   Simulator::Stop (Seconds (m_totalTime));
-  Simulator::Run ();
-  Simulator::Destroy ();
 
-  Simulator::Stop (Seconds (m_totalTime));
+  // netamin:
+  AnimationInterface anim ("lorawan-netamin.xml");
+  // stationary nodes: "You should assign the ConstantPositionMobilityModel. Constant Position is a kind of mobility."
+  //for (NodeContainer::Iterator i = m_allNodes.Begin (); i != m_allNodes.End (); ++i)
+  //{
+  //  Ptr<Node> node = *i;
+  //  //Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (node->GetDevice (0));
+  //  Ptr<MobilityModel> nodeMobility = node->GetObject<MobilityModel> ();
+  //  NS_ASSERT (nodeMobility);
+  //  Vector position = nodeMobility->GetPosition ();
+
+  //  anim.SetConstantPosition (node, position.x, position.y);
+  //}
+  anim.EnablePacketMetadata (true);
 
   Simulator::Run ();
 

@@ -42,6 +42,7 @@
 #include "ns3/wimax-mac-header.h"
 #include "ns3/wifi-net-device.h"
 #include "ns3/wifi-mac.h"
+#include "ns3/lorawan-net-device.h"
 #include "ns3/constant-position-mobility-model.h"
 #include "ns3/lte-ue-phy.h"
 #include "ns3/lte-enb-phy.h"
@@ -449,6 +450,7 @@ AnimationInterface::MobilityAutoCheck ()
       PurgePendingPackets (AnimationInterface::WIMAX);
       PurgePendingPackets (AnimationInterface::LTE);
       PurgePendingPackets (AnimationInterface::CSMA);
+      PurgePendingPackets (AnimationInterface::LORAWAN);
       Simulator::Schedule (m_mobilityPollInterval, &AnimationInterface::MobilityAutoCheck, this);
     }
 }
@@ -686,6 +688,34 @@ AnimationInterface::WifiMacRxDropTrace (std::string context, Ptr<const Packet> p
 }
 
 void
+AnimationInterface::LoRaWANMacTxTrace (std::string context, Ptr<const Packet> p)
+{
+  const Ptr <const Node> node = GetNodeFromContext (context);
+  ++m_nodeLoRaWANMacTx[node->GetId ()];
+}
+
+void
+AnimationInterface::LoRaWANMacTxDropTrace (std::string context, Ptr<const Packet> p)
+{
+  const Ptr <const Node> node = GetNodeFromContext (context);
+  ++m_nodeLoRaWANMacTxDrop[node->GetId ()];
+}
+
+void
+AnimationInterface::LoRaWANMacRxTrace (std::string context, Ptr<const Packet> p)
+{
+  const Ptr <const Node> node = GetNodeFromContext (context);
+  ++m_nodeLoRaWANMacRx[node->GetId ()];
+}
+
+void
+AnimationInterface::LoRaWANMacRxDropTrace (std::string context, Ptr<const Packet> p)
+{
+  const Ptr <const Node> node = GetNodeFromContext (context);
+  ++m_nodeLoRaWANMacRxDrop[node->GetId ()];
+}
+
+void
 AnimationInterface::Ipv4TxTrace (std::string context, Ptr<const Packet> p, Ptr<Ipv4> ipv4, uint32_t interfaceIndex)
 {
   const Ptr <const Node> node = GetNodeFromContext (context);
@@ -870,6 +900,82 @@ AnimationInterface::WifiPhyRxBeginTrace (std::string context, Ptr<const Packet> 
   /// \todo NS_ASSERT (WifiPacketIsPending (animUid) == true);
   m_pendingWifiPackets[animUid].ProcessRxBegin (ndev, Simulator::Now ().GetSeconds ());
   OutputWirelessPacketRxInfo (p, m_pendingWifiPackets[animUid], animUid);
+}
+
+void 
+AnimationInterface::LoRaWANPhyTxBeginTrace (std::string context,
+                                           Ptr<const Packet> p)
+{
+  NS_LOG_FUNCTION (this);
+  CHECK_STARTED_INTIMEWINDOW_TRACKPACKETS;
+
+  Ptr <NetDevice> ndev = GetNetDeviceFromContext (context);
+  NS_ASSERT (ndev);
+  Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (ndev);
+  NS_ASSERT (netDevice);
+
+  Ptr <Node> n = ndev->GetNode ();
+  NS_ASSERT (n);
+
+  UpdatePosition (n);
+
+  // We need to couple the MAC address (i.e. device address) of the sender to the nodeId of the sender
+  // We don't actually assign MAC addresses to gateways in the LoRaWAN module, this is problematic as we can not distuingish between multiple gateways in netamin.
+  // TODO: Fix
+  // For end devices: get MAC address from the net device
+  // For gateways: assume fixed MAC address of ff:ff:ff:ff
+  std::ostringstream oss;
+  if (netDevice->GetDeviceType () == LORAWAN_DT_END_DEVICE_CLASS_A) {
+    Ipv4Address nodeAddr = netDevice->GetMac()->GetDevAddr ();
+    oss << nodeAddr;
+  } else if (netDevice->GetDeviceType () == LORAWAN_DT_GATEWAY) {
+    Ipv4Address nodeAddr = Ipv4Address("255.255.255.255");
+    oss << nodeAddr;
+  } else {
+    NS_LOG_WARN ("Unrecognized LoRaWAN device type");
+    return;
+  }
+
+  m_macToNodeIdMap[oss.str ()] = n->GetId ();
+  NS_LOG_INFO ("Added Mac" << oss.str () << " node:" <<m_macToNodeIdMap[oss.str ()]);
+
+  ++gAnimUid;
+  NS_LOG_INFO ("LrWpan TxBeginTrace for packet:" << gAnimUid);
+  AddByteTag (gAnimUid, p);
+
+  AnimPacketInfo pktInfo (ndev, Simulator::Now ());
+  AddPendingPacket (AnimationInterface::LORAWAN, gAnimUid, pktInfo);
+
+  OutputWirelessPacketTxInfo (p, m_pendingLoRaWANPackets[gAnimUid], gAnimUid);
+}
+
+void
+AnimationInterface::LoRaWANPhyRxBeginTrace (std::string context,
+                                           Ptr<const Packet> p)
+{
+  NS_LOG_FUNCTION (this);
+  CHECK_STARTED_INTIMEWINDOW_TRACKPACKETS;
+  Ptr <NetDevice> ndev = GetNetDeviceFromContext (context);
+  NS_ASSERT (ndev);
+  Ptr <Node> n = ndev->GetNode ();
+  NS_ASSERT (n);
+
+  AnimByteTag tag;
+  if (!p->FindFirstMatchingByteTag (tag))
+    {
+      return;
+    }
+
+  uint64_t animUid = GetAnimUidFromPacket (p);
+  NS_LOG_INFO ("LoRaWAN RxBeginTrace for packet:" << animUid);
+  if (!IsPacketPending (animUid, AnimationInterface::LORAWAN))
+    {
+      NS_LOG_WARN ("LoRaWANPhyRxBeginTrace: unknown Uid - !INVESTIGATE!");
+    }
+
+  UpdatePosition (n);
+  m_pendingLoRaWANPackets[animUid].ProcessRxBegin (ndev, Simulator::Now ().GetSeconds ());
+  OutputWirelessPacketRxInfo (p, m_pendingLoRaWANPackets[animUid], animUid);
 }
 
 void 
@@ -1167,6 +1273,11 @@ AnimationInterface::ProtocolTypeToPendingPackets (AnimationInterface::ProtocolTy
           pendingPackets = &m_pendingLtePackets;
           break;
         }
+      case AnimationInterface::LORAWAN:
+        {
+          pendingPackets = &m_pendingLoRaWANPackets;
+          break;
+        }
     }
   return pendingPackets;
 
@@ -1201,6 +1312,11 @@ AnimationInterface::ProtocolTypeToString (AnimationInterface::ProtocolType proto
       case AnimationInterface::LTE:
         {
           result = "LTE";
+          break;
+        }
+      case AnimationInterface::LORAWAN:
+        {
+          result = "LORAWAN";
           break;
         }
     }
@@ -1458,6 +1574,50 @@ AnimationInterface::ConnectCallbacks ()
                    MakeCallback (&AnimationInterface::WifiPhyTxDropTrace, this));
   Config::Connect ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/PhyRxDrop",
                    MakeCallback (&AnimationInterface::WifiPhyRxDropTrace, this));
+
+  // LoRaWAN Mac & Phy
+  // As LoRaWAN gateways have multiple Phy/Mac objects we can not use the config paths to connect the trace source, instead we do it manually:
+  for (NodeList::Iterator i = NodeList::Begin (); i != NodeList::End (); ++i)
+  {
+    Ptr<Node> node = *i;
+    Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (node->GetDevice (0));
+    if (!netDevice)
+      continue;
+    LoRaWANDeviceType deviceType = netDevice->GetDeviceType ();
+
+    // Generate the trace context:
+    // TODO: can we automatically generate a context from an ns-3 object?
+    std::string context;
+    std::stringstream out;
+    out << "/NodeList/" << std::to_string(node->GetId()) << "/DeviceList/" << "0" << "/"; // for reference: NodeList/*/DeviceList/*/
+    context = out.str();
+
+    if (deviceType == LORAWAN_DT_END_DEVICE_CLASS_A) {
+      Ptr<LoRaWANMac> mac = netDevice->GetMac ();
+      mac->TraceConnect("MacTx", context, MakeCallback (&AnimationInterface::LoRaWANMacTxTrace, this));
+      mac->TraceConnect("MacTxDrop", context, MakeCallback (&AnimationInterface::LoRaWANMacTxDropTrace, this));
+      mac->TraceConnect("MacRx", context, MakeCallback (&AnimationInterface::LoRaWANMacRxTrace, this));
+      mac->TraceConnect("MacRxDrop", context, MakeCallback (&AnimationInterface::LoRaWANMacRxDropTrace, this));
+
+      Ptr<LoRaWANPhy> phy = netDevice->GetPhy ();
+      phy->TraceConnect("PhyTxBegin", context, MakeCallback (&AnimationInterface::LoRaWANPhyTxBeginTrace, this));
+      phy->TraceConnect("PhyRxBegin", context, MakeCallback (&AnimationInterface::LoRaWANPhyRxBeginTrace, this));
+    } else if (deviceType == LORAWAN_DT_GATEWAY) {
+      for (auto &mac : netDevice->GetMacs ()) {
+        mac->TraceConnect("MacTx", context, MakeCallback (&AnimationInterface::LoRaWANMacTxTrace, this));
+        mac->TraceConnect("MacTxDrop", context, MakeCallback (&AnimationInterface::LoRaWANMacTxDropTrace, this));
+        mac->TraceConnect("MacRx", context, MakeCallback (&AnimationInterface::LoRaWANMacRxTrace, this));
+        mac->TraceConnect("MacRxDrop", context, MakeCallback (&AnimationInterface::LoRaWANMacRxDropTrace, this));
+      }
+
+      for (auto &phy : netDevice->GetPhys() ) {
+        phy->TraceConnect("PhyTxBegin", context, MakeCallback (&AnimationInterface::LoRaWANPhyTxBeginTrace, this));
+        phy->TraceConnect("PhyRxBegin", context, MakeCallback (&AnimationInterface::LoRaWANPhyRxBeginTrace, this));
+      }
+    } else{
+      NS_LOG_WARN ("Unknown LoRaWAN device type");
+    }
+  }
 }
 
 Vector 

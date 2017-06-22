@@ -7,7 +7,7 @@
 #     conf.check_nonfatal(header_name='stdint.h', define_name='HAVE_STDINT_H')
 
 def build(bld):
-    module = bld.create_ns3_module('lorawan', ['core', 'network', 'mobility', 'spectrum', 'propagation', 'applications'])
+    module = bld.create_ns3_module('lorawan', ['core', 'network', 'mobility', 'spectrum', 'propagation', 'applications']) # , 'visualizer'])
     module.source = [
         'model/lorawan.cc',
         'model/lorawan-enddevice-application.cc',

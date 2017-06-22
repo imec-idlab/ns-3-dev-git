@@ -497,7 +497,8 @@ private:
       LTE,
       WIFI,
       WIMAX,
-      CSMA
+      CSMA,
+      LORAWAN
     } ProtocolType;
 
   typedef struct
@@ -588,6 +589,7 @@ private:
   AnimUidPacketInfoMap m_pendingWifiPackets;
   AnimUidPacketInfoMap m_pendingWimaxPackets;
   AnimUidPacketInfoMap m_pendingLtePackets;
+  AnimUidPacketInfoMap m_pendingLoRaWANPackets;
   AnimUidPacketInfoMap m_pendingCsmaPackets;
   AnimUidPacketInfoMap m_pendingUanPackets;
   std::map <uint32_t, Vector> m_nodeLocation;
@@ -616,6 +618,10 @@ private:
   NodeCounterMap64 m_nodeWifiMacRxDrop;
   NodeCounterMap64 m_nodeWifiPhyTxDrop;
   NodeCounterMap64 m_nodeWifiPhyRxDrop;
+  NodeCounterMap64 m_nodeLoRaWANMacTx;
+  NodeCounterMap64 m_nodeLoRaWANMacTxDrop;
+  NodeCounterMap64 m_nodeLoRaWANMacRx;
+  NodeCounterMap64 m_nodeLoRaWANMacRxDrop;
 
   const std::vector<std::string> GetElementsFromContext (const std::string& context) const;
   Ptr <Node> GetNodeFromContext (const std::string& context) const;
@@ -687,6 +693,36 @@ private:
                        Ptr<const Packet>);
   void WifiPhyRxDropTrace (std::string context,
                        Ptr<const Packet>);
+
+  /**
+   * LoRaWAN MAC transmit trace function
+   * \param context the context
+   * \param p the packet
+   */
+  void LoRaWANMacTxTrace (std::string context,
+                         Ptr<const Packet> p);
+  /**
+   * LoRaWAN MAC transmit drop trace function
+   * \param context the context
+   * \param p the packet
+   */
+  void LoRaWANMacTxDropTrace (std::string context,
+                             Ptr<const Packet> p);
+  /**
+   * LoRaWAN MAC receive trace function
+   * \param context the context
+   * \param p the packet
+   */
+  void LoRaWANMacRxTrace (std::string context,
+                         Ptr<const Packet> p);
+  /**
+   * LoRaWAN MAC receive drop trace function
+   * \param context the context
+   * \param p the packet
+   */
+  void LoRaWANMacRxDropTrace (std::string context,
+                         Ptr<const Packet> p);
+
   void DevTxTrace (std::string context,
                    Ptr<const Packet> p,
                    Ptr<NetDevice> tx,
@@ -697,6 +733,24 @@ private:
                             Ptr<const Packet> p);
   void WifiPhyRxBeginTrace (std::string context,
                             Ptr<const Packet> p);
+
+  /**
+   * LoRaWAN Phy receive begin trace function
+   *
+   * \param context the context
+   * \param p the packet
+   */
+  void LoRaWANPhyTxBeginTrace (std::string context,
+                              Ptr<const Packet> p);
+  /**
+   * LoRaWAN Phy receive begin trace function
+   *
+   * \param context the context
+   * \param p the packet
+   */
+  void LoRaWANPhyRxBeginTrace (std::string context,
+                              Ptr<const Packet> p);
+
   void WimaxTxTrace (std::string context,
                      Ptr<const Packet> p,
 		     const Mac48Address &);

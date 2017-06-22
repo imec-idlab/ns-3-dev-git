@@ -4,7 +4,7 @@ def build(bld):
     obj = bld.create_ns3_program('lorawan-example', ['lorawan'])
     obj.source = 'lorawan-example.cc'
 
-    obj = bld.create_ns3_program('lorawan-example-tracing', ['lorawan'])
+    obj = bld.create_ns3_program('lorawan-example-tracing', ['lorawan', 'netanim'])
     obj.source = 'lorawan-example-tracing.cc'
 
     obj = bld.create_ns3_program('lorawan-phy-example', ['lorawan'])
