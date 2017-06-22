@@ -69,6 +69,7 @@ public:
                double discRadius,
                double totalTime,
                uint32_t usPacketSize,
+               uint32_t usMaxBytes,
                double usDataPeriod,
                bool usConfirmedData,
                uint32_t dsPacketSize,
@@ -144,6 +145,7 @@ private:
   uint8_t m_fixedDataRateIndex;
 
   uint32_t m_usPacketSize;
+  uint32_t m_usMaxBytes;
   double m_usDataPeriod; // <! Period between subsequent data transmission of end devices
   bool m_usConfirmdData;
 
@@ -206,6 +208,7 @@ int main (int argc, char *argv[])
   double drCalcPerLimit = 0.01;
   double drCalcFixedDRIndex = 0;
   uint32_t usPacketSize = 21;
+  uint32_t usMaxBytes = 0;
   double usDataPeriod = 600.0;
   bool usConfirmedData = false;
   uint32_t dsPacketSize = 21;
@@ -233,6 +236,7 @@ int main (int argc, char *argv[])
   cmd.AddValue ("drCalcPerLimit", "PER limit to use when using the PER Data Rate Calculation method (use index = 0)[Default:0.01]", drCalcPerLimit);
   cmd.AddValue ("drCalcFixedDRIndex", "Fixed Data Rate index to assign when using the Fixed Data Rate Calculation method (use index = 2)[Default:0]", drCalcFixedDRIndex);
   cmd.AddValue ("usPacketSize", "Packet size used for generating US packets[Default:21]", usPacketSize);
+  cmd.AddValue ("usMaxBytes", "Maximum number of bytes to be queued for transmission in the upstream direction, note this does not take into account retransmissions. 0 means no limit. [Default:0]", usMaxBytes);
   cmd.AddValue ("usDataPeriod", "Period between subsequent Upstream data transmissions from an end device[Default:600]", usDataPeriod);
   cmd.AddValue ("usConfirmedData", "0 for Unconfirmed Upstream Data MAC packets, 1 for Confirmed Upstream Data MAC Packets[Default:0]", usConfirmedData);
   cmd.AddValue ("dsPacketSize", "Packet size used for generating DS packets[Default:21]", dsPacketSize);
@@ -400,6 +404,7 @@ int main (int argc, char *argv[])
     simSettings << "\ttotalTime = " << totalTime << std::endl;
     simSettings << "\tnRuns = " << nRuns << std::endl;
     simSettings << "\tusPacketSize = " << usPacketSize << std::endl;
+    simSettings << "\tusMaxBytes = " << usMaxBytes << std::endl;
     simSettings << "\tusDataPeriod = " << usDataPeriod << std::endl;
     simSettings << "\tusConfirmedData = " << usConfirmedData << std::endl;
     simSettings << "\tdsPacketSize = " << dsPacketSize << std::endl;
@@ -446,7 +451,7 @@ int main (int argc, char *argv[])
     example.SetDRCalcPerLimit (drCalcPerLimit);
     example.SetDrCalcFixedDrIndex (drCalcFixedDRIndex);
     example.CaseRun (nEndDevices, nGateways, discRadius, totalTime,
-        usPacketSize, usDataPeriod, usConfirmedData,
+        usPacketSize, usMaxBytes, usDataPeriod, usConfirmedData,
         dsPacketSize, dsDataGenerate, dsDataExpMean, dsConfirmedData,
         verbose, stdcout, tracePhyTransmissions, tracePhyStates, traceMacPackets, traceMacStates, traceNsDsMsgs, traceMisc,
         phyTransmissionTraceCSVFileName.str (), phyStateTraceCSVFileName.str (), macPacketTraceCSVFileName.str (), macStateTraceCSVFileName.str (), nsDSMsgTraceCSVFileName.str(),  miscTraceCSVFileName.str(), nodesCSVFileName.str());
@@ -459,7 +464,7 @@ LoRaWANExampleTracing::LoRaWANExampleTracing () : m_nrRW1Sent(0), m_nrRW2Sent(0)
 
 void
 LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double discRadius, double totalTime,
-    uint32_t usPacketSize, double usDataPeriod, bool usConfirmedData,
+    uint32_t usPacketSize, uint32_t usMaxBytes,double usDataPeriod, bool usConfirmedData,
     uint32_t dsPacketSize, bool dsDataGenerate, double dsDataExpMean, bool dsConfirmedData,
     bool verbose, bool stdcout, bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates, bool traceNsDsMsgs, bool traceMisc,
     std::string phyTransmissionTraceCSVFileName, std::string phyStateTraceCSVFileName, std::string macPacketTraceCSVFileName, std::string macStateTraceCSVFileName, std::string nsDSMsgTraceCSVFileName, std::string miscTraceCSVFileName, std::string nodesCSVFileName)
@@ -470,6 +475,7 @@ LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double
   m_totalTime = totalTime;
 
   m_usPacketSize = usPacketSize;
+  m_usMaxBytes = usMaxBytes;
   m_usDataPeriod = usDataPeriod;
   m_usConfirmdData = usConfirmedData;
 
@@ -649,6 +655,7 @@ LoRaWANExampleTracing::InstallApplications ()
   m_factory.SetTypeId ("ns3::LoRaWANEndDeviceApplication");
   // Attributes shared by all end device apps:
   m_factory.Set ("PacketSize", UintegerValue (m_usPacketSize));
+  m_factory.Set ("MaxBytes", UintegerValue (m_usMaxBytes));
   m_factory.Set ("ConfirmedDataUp", BooleanValue (m_usConfirmdData));
   std::stringstream upstreamiatss;
   upstreamiatss << "ns3::ConstantRandomVariable[Constant=" << m_usDataPeriod << "]";
