@@ -91,6 +91,11 @@ public:
   void SetDeviceType (LoRaWANDeviceType deviceType);
 
   /**
+   * \brief Set the NbRep attribute of the LoRaWANNetDevice objects created by this helper (only for end device net devices)
+   */
+  void SetNbRep (uint8_t rep);
+
+  /**
    * \brief Install a LoRaWANNetDevice and the associated structures (e.g., channel) in the nodes.
    * \param c a set of nodes
    * \returns A container holding the added net devices.
@@ -126,7 +131,7 @@ private:
 private:
   Ptr<SpectrumChannel> m_channel; //!< channel to be used for the devices
   LoRaWANDeviceType m_deviceType; //!< the device type to use when creating new LoRaWANNetDevice objects
-
+  uint8_t m_nbRep; //!< number of repetitions for unconfirmed us data (only for end devices)
 };
 
 }

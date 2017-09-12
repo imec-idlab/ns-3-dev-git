@@ -20,6 +20,7 @@
 #include "lorawan.h"
 #include "lorawan-mac.h"
 #include "lorawan-mac-header.h"
+#include "lorawan-net-device.h"
 #include "lorawan-frame-header.h"
 #include <ns3/simulator.h>
 #include <ns3/log.h>
@@ -607,15 +608,15 @@ LoRaWANMac::PdDataConfirm (LoRaWANPhyEnumeration status)
   LoRaWANMacHeader macHdr;
   m_txPkt->PeekHeader (macHdr);
 
-  std::ostringstream os;
-  m_txPkt->Print (os);
-  NS_LOG_DEBUG (this << " " << os.str () );
+  //std::ostringstream os;
+  //m_txPkt->Print (os);
+  //NS_LOG_DEBUG (this << " " << os.str () );
 
   if (status == LORAWAN_PHY_SUCCESS)
     {
       NS_ASSERT_MSG (m_txQueue.size () > 0, "TxQsize = 0");
       TxQueueElement *txQElement = m_txQueue.front ();
-      // As no Ack is comming, notify upper layer that packet was sent and remove packet from queue
+      // As no Ack is comming, notify upper layer that packet was sent and check if packet can be removed from queue
       if (!macHdr.IsConfirmed ())
       {
         m_macTxOkTrace (m_txPkt);
@@ -627,9 +628,15 @@ LoRaWANMac::PdDataConfirm (LoRaWANPhyEnumeration status)
             m_dataConfirmCallback (confirmParams);
           }
 
-        // We don't need to retransmit the packet, so we can remove it from our queue
-        NS_LOG_DEBUG (this << " Sent packet, removing packet from queue.");
-        RemoveFirstTxQElement (true);
+        // Reduce number of transmissions by one
+        txQElement->lorawanDataRequestParams.m_numberOfTransmissions--;
+
+        // Check if we can remove the packet from the queue
+        if (txQElement->lorawanDataRequestParams.m_numberOfTransmissions == 0) {
+          // UNC packet has reached 0 tx attempts, so we can remove it from our queue
+          NS_LOG_DEBUG (this << " UNC packet reached zero transmissions, removing packet from queue.");
+          RemoveFirstTxQElement (true);
+        }
       } else {
         if (m_deviceType == LORAWAN_DT_END_DEVICE_CLASS_A) {
           // For confirmed messages, decrease the number of transmissions
@@ -693,11 +700,24 @@ LoRaWANMac::sendMACPayloadRequest (LoRaWANDataRequestParams params, Ptr<Packet> 
 
   if ((params.m_msgType == LORAWAN_CONFIRMED_DATA_UP)  || (params.m_msgType == LORAWAN_CONFIRMED_DATA_DOWN)) {
     if (params.m_numberOfTransmissions == 0) {
-      NS_LOG_WARN (this << "Number of transmissions is not set on frame, setting to " << DEFAULT_NUMBER_US_TRANSMISSIONS);
+      NS_LOG_WARN (this << "Number of transmissions is not set on CON frame, setting to " << DEFAULT_NUMBER_US_TRANSMISSIONS);
       params.m_numberOfTransmissions = DEFAULT_NUMBER_US_TRANSMISSIONS;
     }
+  } else if (params.m_msgType == LORAWAN_UNCONFIRMED_DATA_UP) {
+    if (params.m_numberOfTransmissions == 0) {
+      Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice>(this->GetPhy()->GetDevice());
+      if (netDevice) {
+        UintegerValue nbRep(1);
+        netDevice->GetAttribute("NbRep", nbRep);
+
+        NS_LOG_WARN (this << "Number of transmissions is not set on UNC US frame, setting to " << nbRep.Get());
+        params.m_numberOfTransmissions = nbRep.Get();
+      } else {
+        NS_FATAL_ERROR (this << " Unable to get LoRaWANNetDevice from Phy object attached to this mac");
+      }
+    }
   } else {
-      params.m_numberOfTransmissions = 1;
+      params.m_numberOfTransmissions = 1; // DS UNC is always 1 tx
   }
 
   // Gateways may send downstream, end devices only send upstream data
@@ -822,11 +842,20 @@ LoRaWANMac::CheckRetransmission ()
 
   NS_LOG_FUNCTION (this);
 
+  // The packet:
+  TxQueueElement *txQElement = m_txQueue.front ();
+  NS_ASSERT (txQElement != 0);
+  LoRaWANDataRequestParams params = txQElement->lorawanDataRequestParams;
+
+  // This function is only callable for CON US/DS and UNC UP
+  if ((params.m_msgType != LORAWAN_CONFIRMED_DATA_UP) && (params.m_msgType != LORAWAN_CONFIRMED_DATA_DOWN) && (params.m_msgType != LORAWAN_UNCONFIRMED_DATA_UP)) {
+    NS_LOG_ERROR (this << " CheckRetransmission() should only be called when the queued message is CON US/DS or UNC US. message type is equal to " << (uint32_t)params.m_msgType);
+    return;
+  }
+
   // Check if we can send a packet: MAC State, Phy state and RDC
 
   // check whether there are still transmissions remaining for m_txPkt in case of confirmed data
-  TxQueueElement *txQElement = m_txQueue.front ();
-  LoRaWANDataRequestParams params = txQElement->lorawanDataRequestParams;
   if ((params.m_msgType == LORAWAN_CONFIRMED_DATA_UP)  || (params.m_msgType == LORAWAN_CONFIRMED_DATA_DOWN)) {
     if (params.m_numberOfTransmissions == 0) { // confirmed frame has reached its number of transmission attempts, remove it
       m_macTxDropTrace (txQElement->txQPkt);
@@ -845,23 +874,25 @@ LoRaWANMac::CheckRetransmission ()
       // We can recheck the queue in case any other frames are waiting
       CheckQueue ();
       return;
-    } else { // we still have one or more transmissions left for m_txPkt
-      if (!m_setMacState.IsRunning ()) {
-        int8_t subBandIndex = m_lorawanMacRDC->GetSubBandIndexForChannelIndex (params.m_loraWANChannelIndex);
-        NS_ASSERT (subBandIndex >= 0);
-        if (m_lorawanMacRDC->IsSubBandAvailable (subBandIndex)) { // we can sent the next frame
-          m_retransmission++;
-          m_setMacState = Simulator::ScheduleNow (&LoRaWANMac::SetLoRaWANMacState, this, MAC_TX);
-        } else {
-          m_lorawanMacRDC->ScheduleSubBandTimer (this, subBandIndex);
-        }
-      } else {
-          NS_LOG_ERROR ( this << "  called eventhough there is a mac state change scheduled.");
-      }
+    }
+  }
+
+  // We still have one or more transmissions left for m_txPkt
+  if (!m_setMacState.IsRunning ()) {
+    // TODO: frequency hopping between retransmissions ?
+    // Standard mentions "This resend must be done on another channel and must obey the duty cycle limitation as any other normal transmission."
+    // Note that enddevice-application may limit the number of channels via its random variable ...
+    // TODO: frequency hopping also applies to UNC US with NbRep > 1
+    int8_t subBandIndex = m_lorawanMacRDC->GetSubBandIndexForChannelIndex (params.m_loraWANChannelIndex);
+    NS_ASSERT (subBandIndex >= 0);
+    if (m_lorawanMacRDC->IsSubBandAvailable (subBandIndex)) { // we can sent the next frame
+      m_retransmission++;
+      m_setMacState = Simulator::ScheduleNow (&LoRaWANMac::SetLoRaWANMacState, this, MAC_TX);
+    } else {
+      m_lorawanMacRDC->ScheduleSubBandTimer (this, subBandIndex);
     }
   } else {
-    NS_LOG_ERROR ( this << " CheckRetransmission called eventhough m_txPkt is not a confirmed data frame");
-    return;
+      NS_LOG_ERROR ( this << "  called eventhough there is a mac state change scheduled.");
   }
 }
 

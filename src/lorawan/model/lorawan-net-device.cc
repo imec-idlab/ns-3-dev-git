@@ -57,6 +57,10 @@ LoRaWANNetDevice::GetTypeId (void)
                    MakePointerAccessor (&LoRaWANNetDevice::GetMac,
                                         &LoRaWANNetDevice::SetMac),
                    MakePointerChecker<LoRaWANMac> ())
+    .AddAttribute("NbRep", "The number of repetitions for each UNC uplink message",
+                   UintegerValue (1), // default value is one
+                   MakeUintegerAccessor (&LoRaWANNetDevice::m_nbRep),
+                   MakeUintegerChecker<uint8_t> (1, 15))
   ;
   return tid;
 }
@@ -534,6 +538,9 @@ LoRaWANNetDevice::Send (Ptr<Packet> packet, const Address& dest, uint16_t protoc
   loRaWANDataRequestParams.m_numberOfTransmissions = 1;
   if (msgType == LORAWAN_CONFIRMED_DATA_UP) // note that for LORAWAN_CONFIRMED_DATA_DOWN the network server will call ::Send for every retransmission, for end devices ::Send is only called once (app retransmissions vs mac retransmissions)
     loRaWANDataRequestParams.m_numberOfTransmissions = DEFAULT_NUMBER_US_TRANSMISSIONS;
+  else if (msgType == LORAWAN_UNCONFIRMED_DATA_UP)
+    loRaWANDataRequestParams.m_numberOfTransmissions = m_nbRep;
+
 
   if (m_deviceType == LORAWAN_DT_END_DEVICE_CLASS_A) {
     m_mac->sendMACPayloadRequest (loRaWANDataRequestParams, packet);

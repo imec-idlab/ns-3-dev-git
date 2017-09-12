@@ -193,6 +193,17 @@ private:
    * Upper layer callback used for notification of new data packet arrivals.
    */
   ReceiveCallback m_receiveCallback;
+
+  /**
+   * the number of repetitions (NbRep) field is the number of repetition
+   * for each uplink message. This applies only to unconfirmed uplink frames.
+   * The default value is 1. The valid range is [1:15]
+   *
+   * The end-device performs frequency hopping as usual between repeated
+   * transmissions, it does wait after each repetition until the receive windows
+   * have expired.
+   */
+  uint8_t m_nbRep;
 }; // class LoRaWANNetDevice
 
 } // namespace ns3

@@ -80,6 +80,12 @@ LoRaWANHelper::SetDeviceType (LoRaWANDeviceType deviceType)
 }
 
 void
+LoRaWANHelper::SetNbRep (uint8_t nbRep)
+{
+  m_nbRep = nbRep;
+}
+
+void
 LoRaWANHelper::EnableLogComponents (enum LogLevel level)
 {
   //LogComponentEnableAll (LOG_PREFIX_TIME);
@@ -112,21 +118,10 @@ LoRaWANHelper::Install (NodeContainer c)
       netDevice->SetChannel (m_channel); // will also set channel on underlying phy(s)
       netDevice->SetNode (node);
 
-      if (m_deviceType == LORAWAN_DT_END_DEVICE_CLASS_A)
+      if (m_deviceType != LORAWAN_DT_GATEWAY) {
         netDevice->SetAddress (Ipv4Address(addressCounter++)); // will also set channel on underlying phy(s)
-
-      // Actually CompleteConfig in NetDevice will copy the mobility model to the Phy from the Node
-      // Set Node mobility on phy(s):
-      // Ptr<MobilityModel> mobilityModel = node->GetObject<MobilityModel> ()
-      // if (m_deviceType == LORAWAN_DT_END_DEVICE_CLASS_A) {
-      //   netDevice->GetPhy ()->SetMobility (mobilityModel );
-      // } else if (m_deviceType == LORAWAN_DT_GATEWAY) {
-      //   for (auto &phy : netDevice->GetPhys()) {
-      //     phy->SetMobility (mobilityModel);
-      //   }
-      // } else {
-      //   NS_FATAL_ERROR (this << " Unsupported device type");
-      // }
+        netDevice->SetAttribute ("NbRep", UintegerValue (m_nbRep)); // set number of repetitions
+      }
 
       node->AddDevice (netDevice);
       devices.Add (netDevice);
@@ -153,7 +148,6 @@ LoRaWANHelper::SetChannel (std::string channelName)
   Ptr<SpectrumChannel> channel = Names::Find<SpectrumChannel> (channelName);
   m_channel = channel;
 }
-
 
 int64_t
 LoRaWANHelper::AssignStreams (NetDeviceContainer c, int64_t stream)
