@@ -40,51 +40,15 @@ class RandomVariableStream;
 class Socket;
 
 /**
- * \ingroup applications 
+ * \ingroup lorawan
  * \defgroup onoff LoRaWANEndDeviceApplication
  *
- * This traffic generator follows an On/Off pattern: after 
- * Application::StartApplication
- * is called, "On" and "Off" states alternate. The duration of each of
- * these states is determined with the onTime and the offTime random
- * variables. During the "Off" state, no traffic is generated.
- * During the "On" state, cbr traffic is generated. This cbr traffic is
- * characterized by the specified "data rate" and "packet size".
- */
-/**
-* \ingroup onoff
-*
-* \brief Generate traffic to a single destination according to an
-*        OnOff pattern.
-*
-* This traffic generator follows an On/Off pattern: after
-* Application::StartApplication
-* is called, "On" and "Off" states alternate. The duration of each of
-* these states is determined with the onTime and the offTime random
-* variables. During the "Off" state, no traffic is generated.
-* During the "On" state, cbr traffic is generated. This cbr traffic is
-* characterized by the specified "data rate" and "packet size".
-*
-* Note:  When an application is started, the first packet transmission
-* occurs _after_ a delay equal to (packet size/bit rate).  Note also,
-* when an application transitions into an off state in between packet
-* transmissions, the remaining time until when the next transmission
-* would have occurred is cached and is used when the application starts
-* up again.  Example:  packet size = 1000 bits, bit rate = 500 bits/sec.
-* If the application is started at time 3 seconds, the first packet
-* transmission will be scheduled for time 5 seconds (3 + 1000/500)
-* and subsequent transmissions at 2 second intervals.  If the above
-* application were instead stopped at time 4 seconds, and restarted at
-* time 5.5 seconds, then the first packet would be sent at time 6.5 seconds,
-* because when it was stopped at 4 seconds, there was only 1 second remaining
-* until the originally scheduled transmission, and this time remaining
-* information is cached and used to schedule the next transmission
-* upon restarting.
-*
-* If the underlying socket type supports broadcast, this application
-* will automatically enable the SetAllowBroadcast(true) socket option.
+ * This application is intended to run on LoRaWAN end devices class A and was
+ * based of the OnOffApplication, though it has changed drastically in that
+ * US messages are generated according to a random variable (can be fixed) and
+ * not according to a CBR requirement.
 */
-class LoRaWANEndDeviceApplication : public Application 
+class LoRaWANEndDeviceApplication : public Application
 {
 public:
   /**
@@ -140,42 +104,24 @@ private:
 
   // Event handlers
   /**
-   * \brief Start an On period
-   */
-  void StartSending ();
-  /**
-   * \brief Start an Off period
-   */
-  void StopSending ();
-  /**
    * \brief Send a packet
    */
   void SendPacket ();
 
   void HandleRead (Ptr<Socket> socket);
 
-  void HandleDSPacket (Ptr<Packet> p);
+  void HandleDSPacket (Ptr<Packet> p, Address from);
 
   Ptr<Socket>     m_socket;       //!< Associated socket
-  //Address         m_peer;         //!< Peer address
   bool            m_connected;    //!< True if connected
-  //Ptr<RandomVariableStream>  m_onTime;       //!< rng for On Time
-  //Ptr<RandomVariableStream>  m_offTime;      //!< rng for Off Time
   Ptr<RandomVariableStream> m_channelRandomVariable;	//!< rng for channel selection for upstream TX
   Ptr<RandomVariableStream> m_upstreamIATRandomVariable;	//!< rng for inter arrival timing for upstream TX
-  //DataRate        m_cbrRate;      //!< Rate that data is generated
-  //DataRate        m_cbrRateFailSafe;      //!< Rate that data is generated (check copy)
   uint32_t        m_pktSize;      //!< Size of packets
   uint32_t 	  m_dataRateIndex;	//!< Data rate index to use for US transmissions
-  //uint32_t        m_residualBits; //!< Number of generated, but not sent, bits
-  //Time            m_lastStartTime; //!< Time last packet sent
   Time            m_lastTxTime; //!< Time last packet sent
   uint64_t        m_maxBytes;     //!< Limit total number of bytes sent
   uint64_t        m_totBytes;     //!< Total bytes sent so far
   EventId         m_txEvent;     //!< Event id for next start or stop event
-  //EventId         m_startStopEvent;     //!< Event id for next start or stop event
-  //EventId         m_sendEvent;    //!< Event id of pending "send packet" event
-  //TypeId          m_tid;          //!< Type of the socket used
   bool 		  m_confirmedData; //<! Send upstream data as Confirmed Data Up MAC packets
 
   uint8_t         m_framePort;	  //!< Frame port
@@ -185,11 +131,10 @@ private:
   uint64_t        m_totalRx;      //!< Total bytes received
 
   /// Traced Callback: transmitted packets.
-  TracedCallback<Ptr<const Packet> > m_txTrace;
+  TracedCallback<uint32_t, uint8_t, Ptr<const Packet>> m_usMsgTransmittedTrace;
 
-  /// Traced Callback: received packets, source address.
-  TracedCallback<Ptr<const Packet>, const Address &> m_rxTrace;
-
+  /// Traced Callback: received packets, source address, receive window.
+  TracedCallback<uint32_t, uint8_t, Ptr<const Packet>, uint8_t> m_dsMsgReceivedTrace;
 private:
   /**
    * \brief Schedule the next packet transmission

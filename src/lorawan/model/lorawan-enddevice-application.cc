@@ -40,6 +40,7 @@
 #include "ns3/boolean.h"
 #include "ns3/trace-source-accessor.h"
 #include "lorawan.h"
+#include "lorawan-net-device.h"
 #include "lorawan-enddevice-application.h"
 #include "lorawan-frame-header.h"
 #include "ns3/udp-socket-factory.h"
@@ -66,10 +67,6 @@ LoRaWANEndDeviceApplication::GetTypeId (void)
     .SetParent<Application> ()
     .SetGroupName("Applications")
     .AddConstructor<LoRaWANEndDeviceApplication> ()
-    //.AddAttribute ("DataRate", "The data rate in on state.",
-    //               DataRateValue (DataRate ("24b/s")),
-    //               MakeDataRateAccessor (&LoRaWANEndDeviceApplication::m_cbrRate),
-    //               MakeDataRateChecker ())
     .AddAttribute ("DataRateIndex",
                    "DataRate index used for US transmissions of this end device.",
                    UintegerValue (0), // default data rate is SF12
@@ -93,14 +90,6 @@ LoRaWANEndDeviceApplication::GetTypeId (void)
                    StringValue ("ns3::ConstantRandomVariable[Constant=600.0]"),
                    MakePointerAccessor (&LoRaWANEndDeviceApplication::m_upstreamIATRandomVariable),
                    MakePointerChecker <RandomVariableStream>())
-    //.AddAttribute ("OnTime", "A RandomVariableStream used to pick the duration of the 'On' state.",
-    //               StringValue ("ns3::ConstantRandomVariable[Constant=1.0]"),
-    //               MakePointerAccessor (&LoRaWANEndDeviceApplication::m_onTime),
-    //               MakePointerChecker <RandomVariableStream>())
-    //.AddAttribute ("OffTime", "A RandomVariableStream used to pick the duration of the 'Off' state.",
-    //               StringValue ("ns3::ConstantRandomVariable[Constant=1.0]"),
-    //               MakePointerAccessor (&LoRaWANEndDeviceApplication::m_offTime),
-    //               MakePointerChecker <RandomVariableStream>())
     .AddAttribute ("MaxBytes",
                    "The total number of bytes to send. Once these bytes are sent, "
                    "no packet is sent again, even in on state. The value zero means "
@@ -108,12 +97,11 @@ LoRaWANEndDeviceApplication::GetTypeId (void)
                    UintegerValue (0),
                    MakeUintegerAccessor (&LoRaWANEndDeviceApplication::m_maxBytes),
                    MakeUintegerChecker<uint64_t> ())
-//    .AddAttribute ("Protocol", "The type of protocol to use.",
-//                   TypeIdValue (UdpSocketFactory::GetTypeId ()),
-//                   MakeTypeIdAccessor (&LoRaWANEndDeviceApplication::m_tid),
-//                   MakeTypeIdChecker ())
-    .AddTraceSource ("Tx", "A new packet is created and is sent",
-                     MakeTraceSourceAccessor (&LoRaWANEndDeviceApplication::m_txTrace),
+    .AddTraceSource ("USMsgTransmitted", "An US message is sent",
+                     MakeTraceSourceAccessor (&LoRaWANEndDeviceApplication::m_usMsgTransmittedTrace),
+                     "ns3::Packet::TracedCallback")
+    .AddTraceSource ("DSMsgReceived", "An acknowledgement for an US message has been received.",
+                     MakeTraceSourceAccessor (&LoRaWANEndDeviceApplication::m_dsMsgReceivedTrace),
                      "ns3::Packet::TracedCallback")
   ;
   return tid;
@@ -182,9 +170,6 @@ LoRaWANEndDeviceApplication::AssignStreams (int64_t stream)
   m_channelRandomVariable->SetStream (stream);
   m_upstreamIATRandomVariable->SetStream (stream + 1);
   return 2;
-  //m_onTime->SetStream (stream);
-  //m_offTime->SetStream (stream + 1);
-  //return 2;
 }
 
 void
@@ -221,7 +206,6 @@ void LoRaWANEndDeviceApplication::StartApplication () // Called at time specifie
         MakeCallback (&LoRaWANEndDeviceApplication::ConnectionSucceeded, this),
         MakeCallback (&LoRaWANEndDeviceApplication::ConnectionFailed, this));
     }
-  //m_cbrRateFailSafe = m_cbrRate;
 
   // Insure no pending event
   CancelEvents ();
@@ -250,33 +234,9 @@ void LoRaWANEndDeviceApplication::CancelEvents ()
 {
   NS_LOG_FUNCTION (this);
 
-  //if (m_sendEvent.IsRunning () && m_cbrRateFailSafe == m_cbrRate )
-  //  { // Cancel the pending send packet event
-  //    // Calculate residual bits since last packet sent
-  //    Time delta (Simulator::Now () - m_lastStartTime);
-  //    int64x64_t bits = delta.To (Time::S) * m_cbrRate.GetBitRate ();
-  //    m_residualBits += bits.GetHigh ();
-  //  }
-  //m_cbrRateFailSafe = m_cbrRate;
   Simulator::Cancel (m_txEvent);
 }
 
-// Event handlers
-//void LoRaWANEndDeviceApplication::StartSending ()
-//{
-//  NS_LOG_FUNCTION (this);
-//  m_lastStartTime = Simulator::Now ();
-//  ScheduleNextTx ();  // Schedule the send packet event
-//  ScheduleStopEvent ();
-//}
-//
-//void LoRaWANEndDeviceApplication::StopSending ()
-//{
-//  NS_LOG_FUNCTION (this);
-//  CancelEvents ();
-//
-//  ScheduleStartEvent ();
-//}
 
 // Private helpers
 void LoRaWANEndDeviceApplication::ScheduleNextTx ()
@@ -285,10 +245,6 @@ void LoRaWANEndDeviceApplication::ScheduleNextTx ()
 
   if (m_maxBytes == 0 || m_totBytes < m_maxBytes)
     {
-      //uint32_t bits = m_pktSize * 8 - m_residualBits;
-      //NS_LOG_LOGIC ("bits = " << bits);
-      //Time nextTime (Seconds (bits /
-      //                        static_cast<double>(m_cbrRate.GetBitRate ()))); // Time till next packet
       Time nextTime (Seconds (this->m_upstreamIATRandomVariable->GetValue ()));
       NS_LOG_LOGIC (this << " nextTime = " << nextTime);
       m_txEvent = Simulator::Schedule (nextTime,
@@ -299,24 +255,6 @@ void LoRaWANEndDeviceApplication::ScheduleNextTx ()
       StopApplication ();
     }
 }
-
-//void LoRaWANEndDeviceApplication::ScheduleStartEvent ()
-//{  // Schedules the event to start sending data (switch to the "On" state)
-//  NS_LOG_FUNCTION (this);
-//
-//  Time offInterval = Seconds (m_offTime->GetValue ());
-//  NS_LOG_LOGIC ("start at " << offInterval);
-//  m_startStopEvent = Simulator::Schedule (offInterval, &LoRaWANEndDeviceApplication::StartSending, this);
-//}
-//
-//void LoRaWANEndDeviceApplication::ScheduleStopEvent ()
-//{  // Schedules the event to stop sending data (switch to "Off" state)
-//  NS_LOG_FUNCTION (this);
-//
-//  Time onInterval = Seconds (m_onTime->GetValue ());
-//  NS_LOG_LOGIC ("stop at " << onInterval);
-//  m_startStopEvent = Simulator::Schedule (onInterval, &LoRaWANEndDeviceApplication::StopSending, this);
-//}
 
 void LoRaWANEndDeviceApplication::SendPacket ()
 {
@@ -373,7 +311,9 @@ void LoRaWANEndDeviceApplication::SendPacket ()
     msgTypeTag.SetMsgType (LORAWAN_UNCONFIRMED_DATA_UP);
   packet->AddPacketTag (msgTypeTag);
 
-  m_txTrace (packet);
+  uint32_t deviceAddress = myAddress.Get ();
+  m_usMsgTransmittedTrace (deviceAddress, msgTypeTag.GetMsgType (), packet);
+
   int8_t r = m_socket->Send (packet);
   if (r < 0) {
     NS_LOG_ERROR(this << "PacketSocket::Send failed and returned " << static_cast<int16_t>(r) << ". Errno is set to " << m_socket->GetErrno ());
@@ -415,23 +355,21 @@ void LoRaWANEndDeviceApplication::HandleRead (Ptr<Socket> socket)
                        << PacketSocketAddress::ConvertFrom(from).GetPhysicalAddress ()
                        << ", total Rx " << m_totalRx << " bytes");
 
-          this->HandleDSPacket (packet);
+          this->HandleDSPacket (packet, from);
         }
       else
         {
           NS_LOG_WARN (this << " Unexpected address type");
         }
-      m_rxTrace (packet, from);
     }
 }
 
 void
-LoRaWANEndDeviceApplication::HandleDSPacket (Ptr<Packet> p)
+LoRaWANEndDeviceApplication::HandleDSPacket (Ptr<Packet> p, Address from)
 {
   NS_LOG_FUNCTION(this << p);
 
-  // set m_setAck to true for CONFIRMED_DOWN message
-
+  // set m_setAck to true in case a CONFIRMED_DATA_DOWN message was received:
   // Try to parse Packet tag:
   LoRaWANMsgTypeTag msgTypeTag;
   if (p->RemovePacketTag (msgTypeTag)) {
@@ -444,6 +382,20 @@ LoRaWANEndDeviceApplication::HandleDSPacket (Ptr<Packet> p)
     NS_LOG_WARN (this << " LoRaWANMsgTypeTag packet tag is missing from packet");
   }
 
+  // Was packet received in first or second receive window?
+  // -> Look at Mac state
+  Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (GetNode ()->GetDevice (0));
+  Ptr<LoRaWANMac> mac = netDevice->GetMac ();
+  LoRaWANMacState state = mac->GetLoRaWANMacState ();
+  NS_ASSERT (state == MAC_RW1 || state == MAC_RW2);
+
+  // Log packet reception
+  Ipv4Address myAddress = Ipv4Address::ConvertFrom (GetNode ()->GetDevice (0)->GetAddress ());
+  uint32_t deviceAddress = myAddress.Get ();
+  if (state == MAC_RW1)
+    m_dsMsgReceivedTrace (deviceAddress, msgTypeTag.GetMsgType(), p, 1);
+  else if (state == MAC_RW2)
+    m_dsMsgReceivedTrace (deviceAddress, msgTypeTag.GetMsgType(), p, 2);
 }
 
 void LoRaWANEndDeviceApplication::ConnectionSucceeded (Ptr<Socket> socket)

@@ -83,12 +83,14 @@ public:
                bool tracePhyStates,
                bool traceMacPackets,
                bool traceMacStates,
+               bool traceEdMsgs,
                bool traceNsDsMsgs,
                bool traceMisc,
                std::string phyTransmissionTraceCSVFileName,
                std::string phyStateTraceCSVFileName,
                std::string macPacketTraceCSVFileName,
                std::string macStateTraceCSVFileName,
+               std::string edMsgTraceCSVFileName,
                std::string nsDSMsgTraceCSVFileName,
                std::string miscTraceCSVFileName,
                std::string nodesCSVFileName);
@@ -119,11 +121,16 @@ public:
   static void nrRW1MissedTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue);
   static void nrRW2MissedTrace (LoRaWANExampleTracing* example, uint32_t oldValue, uint32_t newValue);
 
+  std::ostringstream GenerateEDMsgTraceOutputLine (std::string traceSource, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet, bool insertNewLine = true);
+  static void USMsgTransmittedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet);
+  static void DSMsgReceivedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet, uint8_t rw);
+
   std::ostringstream GenerateNSDSMsgTraceOutputLine (std::string traceSource, uint32_t deviceAddress, uint8_t transmissionsRemaning, uint8_t msgType, Ptr<const Packet> packet, bool insertNewLine = true);
   static void DSMsgGeneratedTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>);
   static void DSMsgTransmittedTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>, uint8_t rw);
   static void DSMsgAckdTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>);
   static void DSMsgDroppedTrace (LoRaWANExampleTracing* example, uint32_t, uint8_t, uint8_t, Ptr<const Packet>);
+  static void USMsgReceivedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet);
 
   constexpr static const uint8_t m_perPacketSize = 1 + 8 + 8 + 4; // 1B MAC header, 8B frame header, 8 byte payload and 4B MIC
   uint8_t CalculateDataRateIndexPER (Ptr<Application> endDeviceApp);
@@ -162,6 +169,7 @@ private:
   std::string m_phyStateTraceCSVFileName;
   std::string m_macPacketTraceCSVFileName;
   std::string m_macStateTraceCSVFileName;
+  std::string m_edMsgTraceCSVFileName;
   std::string m_nsDSMsgTraceCSVFileName;
   std::string m_miscTraceCSVFileName;
   std::map<std::string, std::ofstream> output_streams;
@@ -193,7 +201,7 @@ private:
   void CreateNodes ();
   void SetupMobility ();
   void CreateDevices ();
-  void SetupTracing (bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates, bool traceNsDsMsgs, bool traceMisc);
+  void SetupTracing (bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates, bool traceEdMsgs, bool traceNsDsMsgs, bool traceMisc);
   void InstallApplications ();
   void OutputNodesToFile ();
 };
@@ -224,6 +232,7 @@ int main (int argc, char *argv[])
   bool tracePhyStates = false;
   bool traceMacPackets = false;
   bool traceMacStates = false;
+  bool traceEdMsgs = false;
   bool traceNsDsMsgs = false;
   bool traceMisc = false;
   std::string outputFileNamePrefix = "output/LoRaWAN-example-tracing";
@@ -253,7 +262,8 @@ int main (int argc, char *argv[])
   cmd.AddValue ("tracePhyStates", "Trace PHY states[Default:0]", tracePhyStates);
   cmd.AddValue ("traceMacPackets", "Trace MAC packets[Default:0]", traceMacPackets);
   cmd.AddValue ("traceMacStates", "Trace MAC states[Default:0]", traceMacStates);
-  cmd.AddValue ("traceNSDSMsgs", "Trace NS downstream messages [Default:0]", traceNsDsMsgs);
+  cmd.AddValue ("traceEDMsgs", "Trace messages on end devices[Default:0]", traceEdMsgs);
+  cmd.AddValue ("traceNSDSMsgs", "Trace NS downstream messages[Default:0]", traceNsDsMsgs);
   cmd.AddValue ("traceMisc", "Trace miscellanous stats[Default:0]", traceMisc);
   cmd.AddValue ("outputFileNamePrefix", "The prefix for the names of the output files[Default:output/LoRaWAN-example-tracing]", outputFileNamePrefix);
   //cmd.AddValue ("phyMode", "Wifi Phy mode[Default:DsssRate11Mbps]", phyMode);
@@ -358,6 +368,20 @@ int main (int argc, char *argv[])
       out3.close ();
     }
 
+    std::ostringstream edMsgTraceCSVFileName;
+    edMsgTraceCSVFileName << simRunFilesPrefix.str() << "-trace-ed-msgs.csv";
+    if (traceEdMsgs) {
+      std::ofstream outed (edMsgTraceCSVFileName.str ().c_str ());
+      outed << "Time," <<
+        "TraceSource," <<
+        "NodeId," <<
+        "MsgType," <<
+        "PacketHex," <<
+        "PacketLength" <<
+        std::endl;
+      outed.close ();
+    }
+
     std::ostringstream nsDSMsgTraceCSVFileName;
     nsDSMsgTraceCSVFileName << simRunFilesPrefix.str() << "-trace-ns-dsmsgs.csv";
     if (traceNsDsMsgs) {
@@ -422,6 +446,7 @@ int main (int argc, char *argv[])
     simSettings << "\ttracePhyStates = " << tracePhyStates << std::endl;
     simSettings << "\ttraceMacPackets = " << traceMacPackets << std::endl;
     simSettings << "\ttraceMacStates = " << traceMacStates << std::endl;
+    simSettings << "\ttraceEdMsgs = " << traceEdMsgs << std::endl;
     simSettings << "\ttraceNsDsMsgs = " << traceNsDsMsgs << std::endl;
     simSettings << "\ttraceMisc = " << traceMisc << std::endl;
     simSettings << "\toutputFileNamePrefix = " << outputFileNamePrefix << std::endl;
@@ -431,6 +456,7 @@ int main (int argc, char *argv[])
     simSettings << "\tphyStateTraceCSVFileName = " << phyStateTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacPacketTraceCSVFileName = " << macPacketTraceCSVFileName.str() << std::endl;
     simSettings << "\tmacStateTraceCSVFileName = " << macStateTraceCSVFileName.str() << std::endl;
+    simSettings << "\tedMsgTraceCSVFileName = " << edMsgTraceCSVFileName.str() << std::endl;
     simSettings << "\tnsDSMsgTraceCSVFileName = " << nsDSMsgTraceCSVFileName.str() << std::endl;
     simSettings << "\tmiscTraceCSVFileName = " << miscTraceCSVFileName.str() << std::endl;
     simSettings << "\tnodesCSVFileName = " << nodesCSVFileName.str() << std::endl;
@@ -458,8 +484,8 @@ int main (int argc, char *argv[])
     example.CaseRun (nEndDevices, nGateways, discRadius, totalTime,
         usPacketSize, usMaxBytes, usDataPeriod, usUnconfirmedDataNbRep, usConfirmedData,
         dsPacketSize, dsDataGenerate, dsDataExpMean, dsConfirmedData,
-        verbose, stdcout, tracePhyTransmissions, tracePhyStates, traceMacPackets, traceMacStates, traceNsDsMsgs, traceMisc,
-        phyTransmissionTraceCSVFileName.str (), phyStateTraceCSVFileName.str (), macPacketTraceCSVFileName.str (), macStateTraceCSVFileName.str (), nsDSMsgTraceCSVFileName.str(),  miscTraceCSVFileName.str(), nodesCSVFileName.str());
+        verbose, stdcout, tracePhyTransmissions, tracePhyStates, traceMacPackets, traceMacStates, traceEdMsgs, traceNsDsMsgs, traceMisc,
+        phyTransmissionTraceCSVFileName.str (), phyStateTraceCSVFileName.str (), macPacketTraceCSVFileName.str (), macStateTraceCSVFileName.str (), edMsgTraceCSVFileName.str(), nsDSMsgTraceCSVFileName.str(),  miscTraceCSVFileName.str(), nodesCSVFileName.str());
   }
 
   return 0;
@@ -471,8 +497,8 @@ void
 LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double discRadius, double totalTime,
     uint32_t usPacketSize, uint32_t usMaxBytes, double usDataPeriod, uint32_t usUnconfirmedDataNbRep, bool usConfirmedData,
     uint32_t dsPacketSize, bool dsDataGenerate, double dsDataExpMean, bool dsConfirmedData,
-    bool verbose, bool stdcout, bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates, bool traceNsDsMsgs, bool traceMisc,
-    std::string phyTransmissionTraceCSVFileName, std::string phyStateTraceCSVFileName, std::string macPacketTraceCSVFileName, std::string macStateTraceCSVFileName, std::string nsDSMsgTraceCSVFileName, std::string miscTraceCSVFileName, std::string nodesCSVFileName)
+    bool verbose, bool stdcout, bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates, bool traceEdMsgs, bool traceNsDsMsgs, bool traceMisc,
+    std::string phyTransmissionTraceCSVFileName, std::string phyStateTraceCSVFileName, std::string macPacketTraceCSVFileName, std::string macStateTraceCSVFileName, std::string edMsgTraceCSVFileName, std::string nsDSMsgTraceCSVFileName, std::string miscTraceCSVFileName, std::string nodesCSVFileName)
 {
   m_nEndDevices = nEndDevices;
   m_nGateways = nGateways;
@@ -497,6 +523,7 @@ LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double
   m_phyStateTraceCSVFileName = phyStateTraceCSVFileName;
   m_macPacketTraceCSVFileName = macPacketTraceCSVFileName;
   m_macStateTraceCSVFileName = macStateTraceCSVFileName;
+  m_edMsgTraceCSVFileName = edMsgTraceCSVFileName;
   m_nsDSMsgTraceCSVFileName = nsDSMsgTraceCSVFileName;
 
   m_miscTraceCSVFileName = miscTraceCSVFileName;
@@ -505,9 +532,9 @@ LoRaWANExampleTracing::CaseRun (uint32_t nEndDevices, uint32_t nGateways, double
   CreateNodes ();
   SetupMobility (); // important: setup mobility before creating devices
   CreateDevices ();
-  SetupTracing (tracePhyTransmissions, tracePhyStates, traceMacPackets, traceMacStates, traceNsDsMsgs, traceMisc);
-
   InstallApplications ();
+
+  SetupTracing (tracePhyTransmissions, tracePhyStates, traceMacPackets, traceMacStates, traceEdMsgs, traceNsDsMsgs, traceMisc);
   OutputNodesToFile ();
 
   std::cout << "Starting simulation for " << m_totalTime << " s ...\n";
@@ -917,7 +944,7 @@ LoRaWANExampleTracing::CalculateFixedDataRateIndex (Ptr<Application> endDeviceAp
 }
 
 void
-LoRaWANExampleTracing::SetupTracing (bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates, bool traceNsDsMsgs, bool traceMisc)
+LoRaWANExampleTracing::SetupTracing (bool tracePhyTransmissions, bool tracePhyStates, bool traceMacPackets, bool traceMacStates, bool traceEdMsgs, bool traceNsDsMsgs, bool traceMisc)
 {
   // Connect trace sources.
   // Trace Phy transmissions:
@@ -1022,6 +1049,18 @@ LoRaWANExampleTracing::SetupTracing (bool tracePhyTransmissions, bool tracePhySt
 
   }
 
+  if (traceEdMsgs) {
+    for (NodeContainer::Iterator i = m_endDeviceNodes.Begin (); i != m_endDeviceNodes.End (); ++i)
+    {
+      Ptr<Node> node = *i;
+      NS_ASSERT (node != 0);
+      Ptr<LoRaWANEndDeviceApplication> edApp = node->GetApplication (0)->GetObject<LoRaWANEndDeviceApplication> ();
+
+      edApp->TraceConnectWithoutContext ("USMsgTransmitted", MakeBoundCallback (&LoRaWANExampleTracing::USMsgTransmittedTrace, this));
+      edApp->TraceConnectWithoutContext ("DSMsgReceived", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgReceivedTrace, this));
+    }
+  }
+
   if (traceNsDsMsgs) {
     Ptr<LoRaWANNetworkServer> lorawanNSPtr = LoRaWANNetworkServer::getLoRaWANNetworkServerPointer ();
     NS_ASSERT (lorawanNSPtr);
@@ -1030,6 +1069,7 @@ LoRaWANExampleTracing::SetupTracing (bool tracePhyTransmissions, bool tracePhySt
       lorawanNSPtr->TraceConnectWithoutContext ("DSMsgTransmitted", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgTransmittedTrace, this));
       lorawanNSPtr->TraceConnectWithoutContext ("DSMsgAckd", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgAckdTrace, this));
       lorawanNSPtr->TraceConnectWithoutContext ("DSMsgDropped", MakeBoundCallback (&LoRaWANExampleTracing::DSMsgDroppedTrace, this));
+      lorawanNSPtr->TraceConnectWithoutContext ("USMsgReceived", MakeBoundCallback (&LoRaWANExampleTracing::USMsgReceivedTrace, this));
     }
   }
 
@@ -1283,6 +1323,51 @@ LoRaWANExampleTracing::nrRW2MissedTrace (LoRaWANExampleTracing* example, uint32_
 }
 
 std::ostringstream
+LoRaWANExampleTracing::GenerateEDMsgTraceOutputLine (std::string traceSource, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet, bool insertNewLine)
+{
+  // Generate hex string of packet
+  std::ostringstream packetHex;
+  packetHex << std::hex << std::setfill('0');
+
+  uint8_t bufferSize = packet->GetSize ();
+  uint8_t buffer[bufferSize];
+  uint32_t nCopied = packet->CopyData (buffer, bufferSize);
+  for (uint32_t i=0; i<nCopied; i++) {
+    packetHex << std::setw(2) << static_cast<unsigned>(buffer[i]);
+  }
+
+  // Generate output line
+  std::ostringstream output;
+  output << std::setiosflags (std::ios::fixed) << std::setprecision (9) << Simulator::Now ().GetSeconds () << ","
+    << traceSource << ","
+    << deviceAddress << ","
+    << (uint32_t) msgType << ","
+    << packetHex.str () << ","
+    << packet->GetSize ();
+
+  if (insertNewLine)
+    output << std::endl;
+
+  return output;
+}
+
+void
+LoRaWANExampleTracing::USMsgTransmittedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet)
+{
+  std::ostringstream output = example->GenerateEDMsgTraceOutputLine ("USMsgTx", deviceAddress, msgType, packet);
+  example->LogOutputLine (output.str (), example->m_edMsgTraceCSVFileName);
+}
+
+void
+LoRaWANExampleTracing::DSMsgReceivedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet, uint8_t rw)
+{
+  std::ostringstream output = example->GenerateEDMsgTraceOutputLine ("DSMsgRx", deviceAddress, msgType, packet, false);
+  // add receive window to output
+  output << "," << (unsigned)rw << std::endl;
+  example->LogOutputLine (output.str (), example->m_edMsgTraceCSVFileName);
+}
+
+std::ostringstream
 LoRaWANExampleTracing::GenerateNSDSMsgTraceOutputLine (std::string traceSource, uint32_t deviceAddress, uint8_t transmissionsRemaning, uint8_t msgType, Ptr<const Packet> packet, bool insertNewLine)
 {
   // Generate hex string of packet
@@ -1339,6 +1424,13 @@ void
 LoRaWANExampleTracing::DSMsgDroppedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t transmissionsRemaning, uint8_t msgType, Ptr<const Packet> packet)
 {
   std::ostringstream output = example->GenerateNSDSMsgTraceOutputLine ("DSMsgDrop", deviceAddress, transmissionsRemaning, msgType, packet);
+  example->LogOutputLine (output.str (), example->m_nsDSMsgTraceCSVFileName);
+}
+
+void
+LoRaWANExampleTracing::USMsgReceivedTrace (LoRaWANExampleTracing* example, uint32_t deviceAddress, uint8_t msgType, Ptr<const Packet> packet)
+{
+  std::ostringstream output = example->GenerateNSDSMsgTraceOutputLine ("USMsgRx", deviceAddress, 0, msgType, packet);
   example->LogOutputLine (output.str (), example->m_nsDSMsgTraceCSVFileName);
 }
 

@@ -78,9 +78,6 @@ LoRaWANNetworkServer::GetTypeId (void)
                    StringValue ("ns3::ExponentialRandomVariable[Mean=10]"),
                    MakePointerAccessor (&LoRaWANNetworkServer::m_downstreamIATRandomVariable),
                    MakePointerChecker <RandomVariableStream>())
-//    .AddTraceSource ("Tx", "A new packet is created and is sent",
-//                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_txTrace),
-//                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("nrRW1Sent",
                      "The number of times that a DS packet was sent in RW1 by this network server",
                      MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_nrRW1Sent),
@@ -112,6 +109,10 @@ LoRaWANNetworkServer::GetTypeId (void)
     .AddTraceSource ("DSMsgDropped",
                      "DS msg has been dropped by this network server",
                      MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_dsMsgDroppedTrace),
+                     "ns3::TracedValueCallback::LoRaWANDSMessageTracedCallback")
+    .AddTraceSource ("USMsgReceived",
+                     "An US msg has been received by this network server",
+                     MakeTraceSourceAccessor (&LoRaWANNetworkServer::m_usMsgReceivedTrace),
                      "ns3::TracedValueCallback::LoRaWANDSMessageTracedCallback")
   ;
   return tid;
@@ -277,6 +278,9 @@ LoRaWANNetworkServer::HandleUSPacket (Ptr<LoRaWANGatewayApplication> lastGW, Add
   } else {
     NS_LOG_WARN (this << " LoRaWANMsgTypeTag not found on packet.");
   }
+
+  // Log that NS received an US packet:
+  m_usMsgReceivedTrace (key, msgTypeTag.GetMsgType(), packet);
 
   // Parse Ack flag:
   if (processMACAck && frmHdr.getAck ()) {
@@ -646,37 +650,6 @@ LoRaWANGatewayApplication::GetTypeId (void)
     .SetParent<Application> ()
     .SetGroupName("Applications")
     .AddConstructor<LoRaWANGatewayApplication> ()
-//    .AddAttribute ("DataRate", "The data rate in on state.",
-//                   DataRateValue (DataRate ("24b/s")),
-//                   MakeDataRateAccessor (&LoRaWANGatewayApplication::m_cbrRate),
-//                   MakeDataRateChecker ())
-//    .AddAttribute ("PacketSize", "The size of packets sent in on state",
-//                   UintegerValue (30),
-//                   MakeUintegerAccessor (&LoRaWANGatewayApplication::m_pktSize),
-//                   MakeUintegerChecker<uint32_t> (1))
-//    .AddAttribute ("Remote", "The address of the destination",
-//                   AddressValue (),
-//                   MakeAddressAccessor (&LoRaWANGatewayApplication::m_peer),
-//                   MakeAddressChecker ())
-//    .AddAttribute ("OnTime", "A RandomVariableStream used to pick the duration of the 'On' state.",
-//                   StringValue ("ns3::ConstantRandomVariable[Constant=1.0]"),
-//                   MakePointerAccessor (&LoRaWANGatewayApplication::m_onTime),
-//                   MakePointerChecker <RandomVariableStream>())
-//    .AddAttribute ("OffTime", "A RandomVariableStream used to pick the duration of the 'Off' state.",
-//                   StringValue ("ns3::ConstantRandomVariable[Constant=1.0]"),
-//                   MakePointerAccessor (&LoRaWANGatewayApplication::m_offTime),
-//                   MakePointerChecker <RandomVariableStream>())
-//    .AddAttribute ("MaxBytes", 
-//                   "The total number of bytes to send. Once these bytes are sent, "
-//                   "no packet is sent again, even in on state. The value zero means "
-//                   "that there is no limit.",
-//                   UintegerValue (0),
-//                   MakeUintegerAccessor (&LoRaWANGatewayApplication::m_maxBytes),
-//                   MakeUintegerChecker<uint64_t> ())
-//    .AddAttribute ("Protocol", "The type of protocol to use.",
-//                   TypeIdValue (UdpSocketFactory::GetTypeId ()),
-//                   MakeTypeIdAccessor (&LoRaWANGatewayApplication::m_tid),
-//                   MakeTypeIdChecker ())
     .AddTraceSource ("Tx", "A new packet is created and is sent",
                      MakeTraceSourceAccessor (&LoRaWANGatewayApplication::m_txTrace),
                      "ns3::Packet::TracedCallback")
@@ -837,7 +810,6 @@ void LoRaWANGatewayApplication::HandleRead (Ptr<Socket> socket)
         {
           NS_LOG_WARN (this << " Unexpected address type");
         }
-      m_rxTrace (packet, from);
     }
 }
 
