@@ -24,6 +24,7 @@
 #include <ns3/traced-callback.h>
 #include <ns3/lorawan-phy.h>
 #include <ns3/lorawan-mac.h>
+#include <ns3/lorawan.h>
 
 namespace ns3 {
 
@@ -123,6 +124,9 @@ public:
    */
   int64_t AssignStreams (int64_t stream);
 
+  void SetMTUSpreadingFactor (LoRaSpreadingFactor sf) { this->m_mtuSpreadingFactor = sf; }
+  LoRaSpreadingFactor GetMTUSpreadingFactor () { return this->m_mtuSpreadingFactor; }
+
 private:
   // Inherited from NetDevice/Object
   virtual void DoDispose (void);
@@ -204,6 +208,9 @@ private:
    * have expired.
    */
   uint8_t m_nbRep;
+
+  LoRaSpreadingFactor 	  m_mtuSpreadingFactor;	//!< The spreading factor to be used for checking MTU limitations.
+
 }; // class LoRaWANNetDevice
 
 } // namespace ns3

@@ -314,6 +314,10 @@ void LoRaWANEndDeviceApplication::SendPacket ()
   uint32_t deviceAddress = myAddress.Get ();
   m_usMsgTransmittedTrace (deviceAddress, msgTypeTag.GetMsgType (), packet);
 
+  // Set NetDevice MTU Data rate before calling socket::Send
+  Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (GetNode ()->GetDevice (0));
+  netDevice->SetMTUSpreadingFactor(LoRaWAN::m_supportedDataRates [m_dataRateIndex].spreadingFactor);
+
   int8_t r = m_socket->Send (packet);
   if (r < 0) {
     NS_LOG_ERROR(this << "PacketSocket::Send failed and returned " << static_cast<int16_t>(r) << ". Errno is set to " << m_socket->GetErrno ());

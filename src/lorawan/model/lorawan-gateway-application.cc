@@ -732,6 +732,18 @@ void LoRaWANGatewayApplication::SendDSPacket (Ptr<Packet> p)
   NS_LOG_FUNCTION (this);
   // p represents MACPayload
 
+  // Get the requested data rate from the packet tag
+  uint8_t dataRateIndex = 12; // SF12 as default value
+
+  LoRaWANPhyParamsTag phyParamsTag;
+  if (p->PeekPacketTag (phyParamsTag)) {
+	  dataRateIndex = phyParamsTag.GetDataRateIndex();
+  }
+
+  // Set NetDevice MTU Data rate before calling socket::Send
+  Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (GetNode ()->GetDevice (0));
+  netDevice->SetMTUSpreadingFactor(LoRaWAN::m_supportedDataRates [dataRateIndex].spreadingFactor);
+
   m_txTrace (p);
   m_socket->Send (p);
 

@@ -65,7 +65,7 @@ LoRaWANNetDevice::GetTypeId (void)
   return tid;
 }
 
-LoRaWANNetDevice::LoRaWANNetDevice () : LoRaWANNetDevice (LORAWAN_DT_END_DEVICE_CLASS_A)
+LoRaWANNetDevice::LoRaWANNetDevice () : m_deviceType (LORAWAN_DT_END_DEVICE_CLASS_A), m_configComplete(false)
 {}
 
 LoRaWANNetDevice::LoRaWANNetDevice (LoRaWANDeviceType deviceType)
@@ -417,7 +417,20 @@ LoRaWANNetDevice::GetMtu (void) const
 {
   NS_LOG_FUNCTION (this);
   // TODO: Depends on the spreading factor:
-  return 51;
+  switch(m_mtuSpreadingFactor) {
+  case LORAWAN_SF6:
+  case LORAWAN_SF7:
+  case LORAWAN_SF8:
+	  return 222;
+  case LORAWAN_SF9:
+	  return 115;
+  default:
+  case LORAWAN_SF10:
+  case LORAWAN_SF11:
+  case LORAWAN_SF12:
+	  return 51;
+
+  }
 }
 
 bool
