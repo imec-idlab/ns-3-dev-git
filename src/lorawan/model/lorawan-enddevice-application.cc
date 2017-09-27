@@ -318,7 +318,7 @@ void LoRaWANEndDeviceApplication::SendPacket ()
   Ptr<LoRaWANNetDevice> netDevice = DynamicCast<LoRaWANNetDevice> (GetNode ()->GetDevice (0));
   netDevice->SetMTUSpreadingFactor(LoRaWAN::m_supportedDataRates [m_dataRateIndex].spreadingFactor);
 
-  int8_t r = m_socket->Send (packet);
+  int16_t r = m_socket->Send (packet);
   if (r < 0) {
     NS_LOG_ERROR(this << "PacketSocket::Send failed and returned " << static_cast<int16_t>(r) << ". Errno is set to " << m_socket->GetErrno ());
   } else {
